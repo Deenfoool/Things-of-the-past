@@ -1,3 +1,10 @@
+const FIRST_CASE = {
+  id: 'lyublino-1994',
+  title: 'Дело №001',
+  location: 'Люблинский рынок',
+  summary: '24 августа 1994 года. Около полудня в дежурную часть поступило сообщение о стрельбе на Люблинском рынке. Есть погибший и раненый. Личности участников и обстоятельства пока не установлены.'
+};
+
 const rooms = {
   office: {
     label: 'Кабинет следователя',
@@ -8,9 +15,22 @@ const rooms = {
         alt: 'Рабочий стол следователя',
         hotspots: [
           {
-            x: 27, y: 34, w: 46, h: 43,
-            title: 'Рабочий стол',
-            text: 'Здесь будут лежать материалы текущего дела: протоколы, фотографии, ориентировки, документы и личные записи следователя.'
+            id: 'case-folder',
+            x: 29, y: 39, w: 28, h: 25,
+            title: 'Папка текущего дела',
+            action: 'case-file'
+          },
+          {
+            id: 'desk-phone',
+            x: 66, y: 38, w: 17, h: 28,
+            title: 'Служебный телефон',
+            text: 'Телефон на рабочем столе. Позже через него будут поступать звонки свидетелей, экспертов и сотрудников дежурной части.'
+          },
+          {
+            id: 'desk-notes',
+            x: 54, y: 42, w: 11, h: 20,
+            title: 'Рабочие записи',
+            text: 'Блокнот и рабочие записи следователя.'
           }
         ]
       },
@@ -20,16 +40,19 @@ const rooms = {
         alt: 'Компьютер в кабинете следователя',
         hotspots: [
           {
+            id: 'office-computer',
             x: 31, y: 7, w: 37, h: 54,
             title: 'Служебный компьютер',
             text: 'Служебный компьютер. Через него будут доступны базы, архивные карточки, результаты экспертиз и служебная информация.'
           },
           {
+            id: 'computer-phone',
             x: 70, y: 42, w: 17, h: 25,
             title: 'Телефон',
             text: 'Служебный телефон. По нему будут поступать звонки, сообщения и новая информация по делу.'
           },
           {
+            id: 'computer-folders',
             x: 0, y: 43, w: 20, h: 32,
             title: 'Папки',
             text: 'Рабочие папки с документами и материалами расследований.'
@@ -42,6 +65,7 @@ const rooms = {
         alt: 'Доска расследования в кабинете',
         hotspots: [
           {
+            id: 'investigation-board',
             x: 17, y: 12, w: 66, h: 67,
             title: 'Доска расследования',
             text: 'Здесь будут появляться фотографии, показания, документы и связи между фактами. Игрок сможет собирать собственную версию событий.'
@@ -54,6 +78,7 @@ const rooms = {
         alt: 'Дверь из кабинета следователя в коридор',
         hotspots: [
           {
+            id: 'office-to-corridor',
             x: 31, y: 7, w: 39, h: 86,
             title: 'Выйти в коридор',
             action: 'room',
@@ -74,6 +99,7 @@ const rooms = {
         alt: 'Дверь в кабинет следователя из коридора',
         hotspots: [
           {
+            id: 'corridor-to-office',
             x: 31, y: 7, w: 39, h: 86,
             title: 'Войти в кабинет',
             action: 'room',
@@ -88,9 +114,10 @@ const rooms = {
         alt: 'Окно дежурного в коридоре',
         hotspots: [
           {
+            id: 'duty-officer-window',
             x: 23, y: 11, w: 56, h: 62,
             title: 'Окно дежурного',
-            text: 'Здесь дежурный будет передавать новые сообщения, ориентировки, документы и информацию, поступившую по текущему делу.'
+            action: 'duty-officer'
           }
         ]
       },
@@ -100,6 +127,7 @@ const rooms = {
         alt: 'Хранилище вещественных доказательств',
         hotspots: [
           {
+            id: 'evidence-storage',
             x: 22, y: 7, w: 58, h: 83,
             title: 'Хранилище улик',
             text: 'Здесь будут храниться вещественные доказательства текущего дела. Позже отсюда можно будет брать предметы для отдельного осмотра и вращения.'
@@ -112,6 +140,7 @@ const rooms = {
         alt: 'Дверь для выезда на место происшествия',
         hotspots: [
           {
+            id: 'corridor-to-locations',
             x: 31, y: 7, w: 39, h: 86,
             title: 'Выезд на локацию',
             action: 'outside'
@@ -147,10 +176,13 @@ if (!rooms[currentRoomId]) currentRoomId = 'office';
 let currentIndex = Number(localStorage.getItem(`things-of-the-past-view-${currentRoomId}`)) || 0;
 if (!Number.isInteger(currentIndex) || currentIndex < 0 || currentIndex >= rooms[currentRoomId].scenes.length) currentIndex = 0;
 
+let caseActive = localStorage.getItem('things-of-the-past-case-active') === FIRST_CASE.id;
 let isTurning = false;
 let observationTimer = null;
 let touchStartX = null;
-let debugHotspots = false;
+let debugHotspots = localStorage.getItem('things-of-the-past-debug-hotspots') === '1';
+
+game.classList.toggle('is-debug', debugHotspots);
 
 for (const room of Object.values(rooms)) {
   for (const scene of room.scenes) {
@@ -198,7 +230,7 @@ function renderHotspots(hotspots) {
 
     const debugLabel = document.createElement('span');
     debugLabel.className = 'hotspot__debug-label';
-    debugLabel.textContent = item.title;
+    debugLabel.textContent = `${item.id || item.title}\nx:${item.x} y:${item.y} w:${item.w} h:${item.h}`;
     button.appendChild(debugLabel);
 
     button.addEventListener('mouseenter', () => showObservation(item.title));
@@ -214,16 +246,75 @@ function activateHotspot(item) {
     return;
   }
 
+  if (item.action === 'case-file') {
+    openCaseFile();
+    return;
+  }
+
+  if (item.action === 'duty-officer') {
+    talkToDutyOfficer();
+    return;
+  }
+
   if (item.action === 'outside') {
-    openModal(
-      'Выезд',
-      'Куда едем?',
-      'Выход на игровые локации подключён. Когда добавим первое дело, здесь появится выбор открытых мест: место преступления, адреса свидетелей и другие доступные точки расследования.'
-    );
+    openLocations();
     return;
   }
 
   openModal('Осмотр', item.title, item.text || 'Здесь появится интерактивное действие.');
+}
+
+function talkToDutyOfficer() {
+  if (!caseActive) {
+    caseActive = true;
+    localStorage.setItem('things-of-the-past-case-active', FIRST_CASE.id);
+    openModal(
+      'Дежурная часть',
+      'Новое сообщение',
+      `${FIRST_CASE.summary} Материалы уже переданы в кабинет. После ознакомления можно выезжать на место.`
+    );
+    return;
+  }
+
+  openModal(
+    'Дежурная часть',
+    'По текущему делу пока без изменений',
+    `Активно ${FIRST_CASE.title}: ${FIRST_CASE.location}. Новых сообщений пока нет.`
+  );
+}
+
+function openCaseFile() {
+  if (!caseActive) {
+    openModal(
+      'Материалы',
+      'Папка пуста',
+      'Нового дела пока нет. Проверь окно дежурного в коридоре.'
+    );
+    return;
+  }
+
+  openModal(
+    'Материалы дела',
+    `${FIRST_CASE.title} — ${FIRST_CASE.location}`,
+    `${FIRST_CASE.summary} На этом этапе подозреваемые, мотив и точная последовательность событий неизвестны.`
+  );
+}
+
+function openLocations() {
+  if (!caseActive) {
+    openModal(
+      'Выезд',
+      'Ехать пока некуда',
+      'Активного дела нет. Сначала проверь окно дежурного.'
+    );
+    return;
+  }
+
+  openModal(
+    'Выезд',
+    'Доступная локация',
+    `${FIRST_CASE.location} — место происшествия. Следующим этапом подключим переход из этой двери непосредственно на первую игровую локацию дела.`
+  );
 }
 
 function rotate(direction) {
@@ -302,6 +393,7 @@ function toggleHelp() {
 function toggleDebugHotspots() {
   debugHotspots = !debugHotspots;
   game.classList.toggle('is-debug', debugHotspots);
+  localStorage.setItem('things-of-the-past-debug-hotspots', debugHotspots ? '1' : '0');
   showObservation(debugHotspots ? 'Точки интереса: показаны' : 'Точки интереса: скрыты');
 }
 
@@ -314,7 +406,7 @@ helpButton.addEventListener('click', toggleHelp);
 document.querySelectorAll('[data-panel]').forEach(button => {
   button.addEventListener('click', () => {
     if (button.dataset.panel === 'case') {
-      openModal('Материалы', 'Текущее дело', 'Дело пока не выбрано. Здесь появятся исходные материалы первого расследования.');
+      openCaseFile();
     } else {
       openModal('Блокнот', 'Записи следователя', 'Записей пока нет. Во время расследования сюда будут попадать важные наблюдения и открытые факты.');
     }
