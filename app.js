@@ -6,6 +6,7 @@ const FIRST_CASE = {
 };
 
 const HOTSPOT_EDITS_KEY = 'things-of-the-past-hotspot-edits-v1';
+const CHARACTER_LAYOUT_KEY = 'things-of-the-past-character-layout-v1';
 const GAME_SETTINGS_KEY = 'things-of-the-past-settings-v1';
 const SAVE_STARTED_KEY = 'things-of-the-past-save-started';
 const PLAYER_SAVE_KEYS = new Set([
@@ -24,11 +25,13 @@ const PLAYER_SAVE_PREFIXES = [
 ];
 const DEVELOPER_STORAGE_KEYS = new Set([
   HOTSPOT_EDITS_KEY,
+  CHARACTER_LAYOUT_KEY,
   'things-of-the-past-hotspot-layout-version',
   'things-of-the-past-debug-hotspots'
 ]);
 const DEVELOPER_STORAGE_PREFIXES = [
-  'things-of-the-past-hotspot-'
+  'things-of-the-past-hotspot-',
+  'things-of-the-past-character-'
 ];
 
 const DIRECTOR_OFFICE_DESK_SCENES = {
@@ -586,6 +589,27 @@ const editorCopyWall = document.getElementById('editorCopyWall');
 const editorExport = document.getElementById('editorExport');
 const editorResetWall = document.getElementById('editorResetWall');
 const editorStatus = document.getElementById('editorStatus');
+const adminModeButtons = Array.from(document.querySelectorAll('[data-admin-mode]'));
+const adminPanels = Array.from(document.querySelectorAll('[data-admin-panel]'));
+const characterEditorRoomName = document.getElementById('characterEditorRoomName');
+const characterEditorSceneName = document.getElementById('characterEditorSceneName');
+const characterSelect = document.getElementById('characterSelect');
+const characterVariantSelect = document.getElementById('characterVariantSelect');
+const characterCreate = document.getElementById('characterCreate');
+const characterDelete = document.getElementById('characterDelete');
+const characterName = document.getElementById('characterName');
+const characterX = document.getElementById('characterX');
+const characterY = document.getElementById('characterY');
+const characterW = document.getElementById('characterW');
+const characterH = document.getElementById('characterH');
+const characterRotation = document.getElementById('characterRotation');
+const characterFlipX = document.getElementById('characterFlipX');
+const characterVisible = document.getElementById('characterVisible');
+const characterCopy = document.getElementById('characterCopy');
+const characterReset = document.getElementById('characterReset');
+const characterResetAll = document.getElementById('characterResetAll');
+const characterExport = document.getElementById('characterExport');
+const characterEditorStatus = document.getElementById('characterEditorStatus');
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -651,8 +675,10 @@ let isTurning = false;
 let observationTimer = null;
 let touchStartX = null;
 let debugHotspots = localStorage.getItem('things-of-the-past-debug-hotspots') === '1';
+let adminMode = 'hotspots';
 let selectedHotspotId = null;
 let editorStatusTimer = null;
+let characterEditorStatusTimer = null;
 
 game.classList.toggle('is-debug', debugHotspots);
 hotspotEditor.setAttribute('aria-hidden', String(!debugHotspots));
@@ -738,7 +764,7 @@ function renderScene() {
   }
 
   renderHotspots(hotspots);
-  updateEditorPanel();
+  updateAdminPanel();
 }
 
 function renderHotspots(hotspots) {
@@ -1058,6 +1084,32 @@ async function copyEditorText(text) {
   setEditorStatus(copied ? 'Скопировано — вставляй в чат' : 'Текст выделен — нажми Ctrl+C', copied);
 }
 
+async function copyCharacterText(text) {
+  characterExport.value = text;
+  let copied = false;
+
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      copied = true;
+    }
+  } catch {
+    copied = false;
+  }
+
+  if (!copied) {
+    try {
+      characterExport.focus();
+      characterExport.select();
+      copied = document.execCommand('copy');
+    } catch {
+      copied = false;
+    }
+  }
+
+  setCharacterEditorStatus(copied ? 'NPC скопирован' : 'Текст выделен — нажми Ctrl+C', copied);
+}
+
 function setEditorStatus(text, success = false) {
   clearTimeout(editorStatusTimer);
   editorStatus.textContent = text;
@@ -1232,7 +1284,7 @@ function transitionTo(roomId, index, direction) {
     game.setAttribute('aria-label', targetRoom.label);
     selectedHotspotId = debugHotspots ? nextSceneData.hotspots?.[0]?.id || null : null;
     renderHotspots(nextSceneData.hotspots || []);
-    updateEditorPanel();
+    updateAdminPanel();
     hotspotsEl.style.pointerEvents = '';
     savePosition();
     isTurning = false;
@@ -1273,6 +1325,7 @@ function toggleHelp() {
 function toggleDebugHotspots(forceValue) {
   debugHotspots = typeof forceValue === 'boolean' ? forceValue : !debugHotspots;
   game.classList.toggle('is-debug', debugHotspots);
+  game.classList.toggle('is-character-debug', debugHotspots && adminMode === 'characters');
   hotspotEditor.setAttribute('aria-hidden', String(!debugHotspots));
   localStorage.setItem('things-of-the-past-debug-hotspots', debugHotspots ? '1' : '0');
 
@@ -1281,8 +1334,9 @@ function toggleDebugHotspots(forceValue) {
   }
 
   renderHotspots(currentScene().hotspots || []);
-  updateEditorPanel();
-  showObservation(debugHotspots ? 'Редактор точек интереса включён' : 'Редактор точек интереса закрыт');
+  updateAdminPanel();
+  window.CharacterOverlays?.render?.();
+  showObservation(debugHotspots ? 'Админ-панель открыта' : 'Админ-панель закрыта');
 }
 
 function clearProgressStorage() {
@@ -1309,6 +1363,191 @@ function restoreDefaultHotspots() {
   }
 }
 
+function setAdminMode(mode) {
+  adminMode = mode === 'characters' ? 'characters' : 'hotspots';
+  game.classList.toggle('is-character-debug', debugHotspots && adminMode === 'characters');
+  adminModeButtons.forEach(button => button.classList.toggle('is-active', button.dataset.adminMode === adminMode));
+  adminPanels.forEach(panel => panel.classList.toggle('is-active', panel.dataset.adminPanel === adminMode));
+  renderHotspots(currentScene().hotspots || []);
+  updateAdminPanel();
+  window.CharacterOverlays?.render?.();
+}
+
+function updateAdminPanel() {
+  updateEditorPanel();
+  updateCharacterEditorPanel();
+}
+
+function currentEditorCharacter() {
+  const selectedId = characterSelect?.value || window.CharacterOverlays?.selectedId?.();
+  return selectedId ? window.CharacterOverlays?.get?.(selectedId) : null;
+}
+
+function updateCharacterEditorPanel() {
+  if (!characterSelect) return;
+  const api = window.CharacterOverlays;
+  const room = currentRoom();
+  const scene = currentScene();
+  characterEditorRoomName.textContent = room.label;
+  characterEditorSceneName.textContent = scene.label;
+
+  if (!api) {
+    characterSelect.innerHTML = '<option>NPC layer загружается</option>';
+    return;
+  }
+
+  const currentCharacters = api.listCurrent?.(true) || [];
+  const selectedId = api.selectedId?.();
+  characterSelect.innerHTML = '';
+
+  if (!currentCharacters.length) {
+    const option = document.createElement('option');
+    option.value = '';
+    option.textContent = 'На сцене нет NPC';
+    characterSelect.appendChild(option);
+  } else {
+    currentCharacters.forEach(character => {
+      const option = document.createElement('option');
+      option.value = character.id;
+      option.textContent = `${character.name || character.id} · ${character.id}`;
+      option.selected = character.id === selectedId;
+      characterSelect.appendChild(option);
+    });
+    if (!currentCharacters.some(character => character.id === selectedId)) {
+      api.select?.(currentCharacters[0].id);
+      return;
+    }
+  }
+
+  const character = currentEditorCharacter();
+  const disabled = !character;
+  [
+    characterVariantSelect, characterDelete, characterName, characterX, characterY,
+    characterW, characterH, characterRotation, characterFlipX, characterVisible,
+    characterCopy, characterReset
+  ].forEach(input => {
+    if (input) input.disabled = disabled;
+  });
+
+  characterVariantSelect.innerHTML = '';
+  if (character) {
+    const variants = api.variantsFor?.(character.type) || [];
+    variants.forEach(variant => {
+      const option = document.createElement('option');
+      option.value = variant.id;
+      option.textContent = variant.label;
+      option.selected = variant.id === character.variantId;
+      characterVariantSelect.appendChild(option);
+    });
+
+    characterName.value = character.name || '';
+    characterX.value = roundCoord(character.x);
+    characterY.value = roundCoord(character.y);
+    characterW.value = roundCoord(character.w);
+    characterH.value = roundCoord(character.h);
+    characterRotation.value = Math.round(character.rotation || 0);
+    characterFlipX.checked = Boolean(character.flipX);
+    characterVisible.checked = character.visible !== false;
+    characterExport.value = buildCharacterExport(character);
+  } else {
+    characterName.value = '';
+    characterX.value = '';
+    characterY.value = '';
+    characterW.value = '';
+    characterH.value = '';
+    characterRotation.value = '';
+    characterFlipX.checked = false;
+    characterVisible.checked = false;
+    characterExport.value = buildCharacterSceneExport();
+  }
+}
+
+function createCharacter() {
+  const character = window.CharacterOverlays?.add?.('market-worker');
+  if (character) {
+    setCharacterEditorStatus('NPC добавлен', true);
+    updateCharacterEditorPanel();
+  }
+}
+
+function deleteSelectedCharacter() {
+  const character = currentEditorCharacter();
+  if (!character) return;
+  window.CharacterOverlays?.remove?.(character.id);
+  setCharacterEditorStatus('NPC удалён', true);
+  updateCharacterEditorPanel();
+}
+
+function updateSelectedCharacterFromInputs() {
+  const character = currentEditorCharacter();
+  if (!character) return;
+
+  const patch = {
+    name: characterName.value.trim() || 'NPC',
+    variantId: characterVariantSelect.value,
+    x: roundCoord(clamp(Number(characterX.value), 0, 100)),
+    y: roundCoord(clamp(Number(characterY.value), 0, 100)),
+    w: roundCoord(clamp(Number(characterW.value), 1, 100)),
+    h: roundCoord(clamp(Number(characterH.value), 1, 100)),
+    rotation: Math.round(clamp(Number(characterRotation.value), -180, 180)),
+    flipX: characterFlipX.checked,
+    visible: characterVisible.checked
+  };
+
+  window.CharacterOverlays?.update?.(character.id, patch);
+  setCharacterEditorStatus('NPC сохранён', true);
+  updateCharacterEditorPanel();
+}
+
+function resetSelectedCharacter() {
+  const character = currentEditorCharacter();
+  if (!character) return;
+  window.CharacterOverlays?.reset?.(character.id);
+  setCharacterEditorStatus('NPC сброшен', true);
+  updateCharacterEditorPanel();
+}
+
+function resetAllCharacters() {
+  window.CharacterOverlays?.resetAll?.();
+  setCharacterEditorStatus('Все NPC сброшены', true);
+  updateCharacterEditorPanel();
+}
+
+function buildCharacterExport(character) {
+  return [
+    `Комната: ${currentRoom().label}`,
+    `Стена: ${currentScene().label}`,
+    `NPC: ${character.name}`,
+    `ID: ${character.id}`,
+    `Тип: ${character.type}`,
+    `Кадр: ${character.variantId}`,
+    `Положение: x=${roundCoord(character.x)}%, y=${roundCoord(character.y)}%, w=${roundCoord(character.w)}%, h=${roundCoord(character.h)}%`,
+    `Поворот: ${Math.round(character.rotation || 0)}°`,
+    `Отражение X: ${character.flipX ? 'да' : 'нет'}`,
+    `Показывать: ${character.visible !== false ? 'да' : 'нет'}`
+  ].join('\n');
+}
+
+function buildCharacterSceneExport() {
+  const characters = window.CharacterOverlays?.listCurrent?.(true) || [];
+  return [
+    `Комната: ${currentRoom().label}`,
+    `Стена: ${currentScene().label}`,
+    `NPC: ${characters.length}`,
+    ...characters.map(character => `${character.id}: ${character.name} · ${character.variantId} · x=${roundCoord(character.x)}%, y=${roundCoord(character.y)}%`)
+  ].join('\n');
+}
+
+function setCharacterEditorStatus(text, success = false) {
+  clearTimeout(characterEditorStatusTimer);
+  characterEditorStatus.textContent = text;
+  characterEditorStatus.classList.toggle('is-success', success);
+  characterEditorStatusTimer = window.setTimeout(() => {
+    characterEditorStatus.textContent = 'NPC сохраняются в браузере';
+    characterEditorStatus.classList.remove('is-success');
+  }, 2600);
+}
+
 function resetRuntimeState() {
   hotspotEdits = loadHotspotEdits();
   restoreDefaultHotspots();
@@ -1320,6 +1559,7 @@ function resetRuntimeState() {
   selectedHotspotId = null;
   debugHotspots = false;
   game.classList.remove('is-debug');
+  game.classList.remove('is-character-debug');
   hotspotEditor.setAttribute('aria-hidden', 'true');
   closeModal();
   help.classList.remove('is-open');
@@ -1368,6 +1608,10 @@ modalBackdrop.addEventListener('click', closeModal);
 helpButton.addEventListener('click', toggleHelp);
 editorClose.addEventListener('click', () => toggleDebugHotspots(false));
 
+adminModeButtons.forEach(button => {
+  button.addEventListener('click', () => setAdminMode(button.dataset.adminMode));
+});
+
 editorZoneSelect.addEventListener('change', () => selectHotspot(editorZoneSelect.value));
 editorCreate.addEventListener('click', createHotspot);
 editorDelete.addEventListener('click', deleteSelectedHotspot);
@@ -1379,6 +1623,36 @@ editorCopyZone.addEventListener('click', () => {
   if (item) copyEditorText(buildZoneExport(item));
 });
 editorCopyWall.addEventListener('click', () => copyEditorText(buildWallExport()));
+
+characterSelect.addEventListener('change', () => window.CharacterOverlays?.select?.(characterSelect.value));
+characterCreate.addEventListener('click', createCharacter);
+characterDelete.addEventListener('click', deleteSelectedCharacter);
+characterVariantSelect.addEventListener('change', updateSelectedCharacterFromInputs);
+characterName.addEventListener('input', updateSelectedCharacterFromInputs);
+[characterX, characterY, characterW, characterH, characterRotation].forEach(input => {
+  input.addEventListener('change', updateSelectedCharacterFromInputs);
+});
+characterFlipX.addEventListener('change', updateSelectedCharacterFromInputs);
+characterVisible.addEventListener('change', updateSelectedCharacterFromInputs);
+characterCopy.addEventListener('click', () => {
+  const character = currentEditorCharacter();
+  if (character) copyCharacterText(buildCharacterExport(character));
+});
+characterReset.addEventListener('click', resetSelectedCharacter);
+characterResetAll.addEventListener('click', resetAllCharacters);
+
+window.addEventListener('characters:select', updateCharacterEditorPanel);
+window.addEventListener('characters:change', updateCharacterEditorPanel);
+window.addEventListener('characters:preview', event => {
+  const character = event.detail?.character;
+  if (!character || character.id !== characterSelect.value) return;
+  characterX.value = roundCoord(character.x);
+  characterY.value = roundCoord(character.y);
+  characterW.value = roundCoord(character.w);
+  characterH.value = roundCoord(character.h);
+  characterRotation.value = Math.round(character.rotation || 0);
+  characterExport.value = buildCharacterExport(character);
+});
 
 document.querySelectorAll('[data-panel]').forEach(button => {
   button.addEventListener('click', () => {

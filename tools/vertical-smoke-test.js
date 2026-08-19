@@ -60,6 +60,7 @@ function assert(condition, message) {
     localStorage.clear();
     localStorage.setItem('things-of-the-past-hotspot-edits-v1', '{"dev":"keep"}');
     localStorage.setItem('things-of-the-past-hotspot-layout-version', 'dev-version-keep');
+    localStorage.setItem('things-of-the-past-character-layout-v1', '[{"id":"dev-npc","roomId":"office"}]');
   });
 
   await page.click('[data-menu-new]');
@@ -67,6 +68,7 @@ function assert(condition, message) {
   const devKeysAfterNewGame = await page.evaluate(() => ({
     edits: localStorage.getItem('things-of-the-past-hotspot-edits-v1'),
     layout: localStorage.getItem('things-of-the-past-hotspot-layout-version'),
+    characters: localStorage.getItem('things-of-the-past-character-layout-v1'),
     saveStarted: localStorage.getItem('things-of-the-past-save-started')
   }));
 
@@ -175,6 +177,7 @@ function assert(condition, message) {
 
   assert(devKeysAfterNewGame.edits === '{"dev":"keep"}', 'New Game removed developer hotspot edits');
   assert(devKeysAfterNewGame.layout === 'dev-version-keep', 'New Game removed developer layout version');
+  assert(devKeysAfterNewGame.characters === '[{"id":"dev-npc","roomId":"office"}]', 'New Game removed developer character layout');
   assert(devKeysAfterNewGame.saveStarted === '1', 'New Game did not start a player save');
   assert(marketViews.length === 4 && marketViews.every(view => view.room === 'market-main' && view.hotspotCount >= 3), 'Market 4-view route failed');
   assert(marketViews.some(view => view.index === 1 && view.characterCount === 1), 'Market worker overlay is missing on side stalls view');

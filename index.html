@@ -62,56 +62,121 @@
     <aside class="hotspot-editor" id="hotspotEditor" aria-hidden="true">
       <div class="hotspot-editor__header">
         <div>
-          <strong>Редактор зон</strong>
+          <strong>Админ-панель сцены</strong>
           <span>F2 — закрыть</span>
         </div>
         <button class="hotspot-editor__close" id="editorClose" type="button" aria-label="Закрыть редактор">×</button>
       </div>
 
-      <div class="hotspot-editor__scene">
-        <span id="editorRoomName">Комната</span>
-        <strong id="editorSceneName">Стена</strong>
-        <small id="editorSceneFile">file.png</small>
+      <div class="admin-editor__modes" role="tablist" aria-label="Режим админ-панели">
+        <button class="is-active" id="adminModeHotspots" type="button" data-admin-mode="hotspots">Зоны</button>
+        <button id="adminModeCharacters" type="button" data-admin-mode="characters">NPC</button>
       </div>
 
-      <label class="hotspot-editor__field">
-        <span>Зоны на этой стене</span>
-        <select id="editorZoneSelect"></select>
-      </label>
+      <section class="admin-editor__panel is-active" id="hotspotEditorPanel" data-admin-panel="hotspots">
+        <div class="hotspot-editor__scene">
+          <span id="editorRoomName">Комната</span>
+          <strong id="editorSceneName">Стена</strong>
+          <small id="editorSceneFile">file.png</small>
+        </div>
 
-      <div class="hotspot-editor__actions hotspot-editor__actions--top">
-        <button id="editorCreate" type="button">+ Новая зона</button>
-        <button id="editorDelete" type="button" class="is-danger">Удалить</button>
-      </div>
+        <label class="hotspot-editor__field">
+          <span>Зоны на этой стене</span>
+          <select id="editorZoneSelect"></select>
+        </label>
 
-      <label class="hotspot-editor__field">
-        <span>Название зоны</span>
-        <input id="editorZoneName" type="text" autocomplete="off" />
-      </label>
+        <div class="hotspot-editor__actions hotspot-editor__actions--top">
+          <button id="editorCreate" type="button">+ Новая зона</button>
+          <button id="editorDelete" type="button" class="is-danger">Удалить</button>
+        </div>
 
-      <div class="hotspot-editor__coords">
-        <label><span>X</span><input id="editorX" type="number" min="0" max="100" step="0.1" /></label>
-        <label><span>Y</span><input id="editorY" type="number" min="0" max="100" step="0.1" /></label>
-        <label><span>W</span><input id="editorW" type="number" min="1" max="100" step="0.1" /></label>
-        <label><span>H</span><input id="editorH" type="number" min="1" max="100" step="0.1" /></label>
-      </div>
+        <label class="hotspot-editor__field">
+          <span>Название зоны</span>
+          <input id="editorZoneName" type="text" autocomplete="off" />
+        </label>
 
-      <p class="hotspot-editor__hint">Перетаскивай рамку мышью. Квадрат в правом нижнем углу меняет размер.</p>
+        <div class="hotspot-editor__coords">
+          <label><span>X</span><input id="editorX" type="number" min="0" max="100" step="0.1" /></label>
+          <label><span>Y</span><input id="editorY" type="number" min="0" max="100" step="0.1" /></label>
+          <label><span>W</span><input id="editorW" type="number" min="1" max="100" step="0.1" /></label>
+          <label><span>H</span><input id="editorH" type="number" min="1" max="100" step="0.1" /></label>
+        </div>
 
-      <div class="hotspot-editor__actions">
-        <button id="editorCopyZone" type="button">Скопировать зону</button>
-        <button id="editorCopyWall" type="button">Скопировать стену</button>
-      </div>
+        <p class="hotspot-editor__hint">Перетаскивай рамку мышью. Квадрат в правом нижнем углу меняет размер.</p>
 
-      <label class="hotspot-editor__field">
-        <span>Текст для отправки мне</span>
-        <textarea id="editorExport" rows="7" readonly></textarea>
-      </label>
+        <div class="hotspot-editor__actions">
+          <button id="editorCopyZone" type="button">Скопировать зону</button>
+          <button id="editorCopyWall" type="button">Скопировать стену</button>
+        </div>
 
-      <div class="hotspot-editor__footer">
-        <button id="editorResetWall" type="button">Сбросить стену</button>
-        <span id="editorStatus" role="status" aria-live="polite">Изменения сохраняются в браузере</span>
-      </div>
+        <label class="hotspot-editor__field">
+          <span>Текст для отправки мне</span>
+          <textarea id="editorExport" rows="7" readonly></textarea>
+        </label>
+
+        <div class="hotspot-editor__footer">
+          <button id="editorResetWall" type="button">Сбросить стену</button>
+          <span id="editorStatus" role="status" aria-live="polite">Изменения сохраняются в браузере</span>
+        </div>
+      </section>
+
+      <section class="admin-editor__panel" id="characterEditorPanel" data-admin-panel="characters">
+        <div class="hotspot-editor__scene">
+          <span id="characterEditorRoomName">Комната</span>
+          <strong id="characterEditorSceneName">Стена</strong>
+          <small>NPC overlay layer</small>
+        </div>
+
+        <label class="hotspot-editor__field">
+          <span>NPC на этой сцене</span>
+          <select id="characterSelect"></select>
+        </label>
+
+        <label class="hotspot-editor__field">
+          <span>Вариант кадра</span>
+          <select id="characterVariantSelect"></select>
+        </label>
+
+        <div class="hotspot-editor__actions hotspot-editor__actions--top">
+          <button id="characterCreate" type="button">+ NPC</button>
+          <button id="characterDelete" type="button" class="is-danger">Удалить</button>
+        </div>
+
+        <label class="hotspot-editor__field">
+          <span>Название NPC</span>
+          <input id="characterName" type="text" autocomplete="off" />
+        </label>
+
+        <div class="hotspot-editor__coords admin-editor__coords--npc">
+          <label><span>X</span><input id="characterX" type="number" min="0" max="100" step="0.1" /></label>
+          <label><span>Y</span><input id="characterY" type="number" min="0" max="100" step="0.1" /></label>
+          <label><span>W</span><input id="characterW" type="number" min="1" max="100" step="0.1" /></label>
+          <label><span>H</span><input id="characterH" type="number" min="1" max="100" step="0.1" /></label>
+          <label><span>R</span><input id="characterRotation" type="number" min="-180" max="180" step="1" /></label>
+        </div>
+
+        <div class="admin-editor__toggles">
+          <label><input id="characterFlipX" type="checkbox" /> Отразить X</label>
+          <label><input id="characterVisible" type="checkbox" /> Показывать</label>
+        </div>
+
+        <p class="hotspot-editor__hint">Перетаскивай NPC по сцене. Нижний правый маркер меняет размер, верхний маркер вращает. Настройки сохраняются отдельно от прогресса игрока.</p>
+
+        <div class="hotspot-editor__actions">
+          <button id="characterCopy" type="button">Скопировать NPC</button>
+          <button id="characterReset" type="button">Сбросить NPC</button>
+        </div>
+
+        <label class="hotspot-editor__field">
+          <span>Текст для отправки мне</span>
+          <textarea id="characterExport" rows="7" readonly></textarea>
+        </label>
+
+        <div class="hotspot-editor__footer">
+          <button id="characterResetAll" type="button">Сбросить всех</button>
+          <span id="characterEditorStatus" role="status" aria-live="polite">NPC сохраняются в браузере</span>
+        </div>
+      </section>
     </aside>
 
     <div class="modal" id="modal" aria-hidden="true">
