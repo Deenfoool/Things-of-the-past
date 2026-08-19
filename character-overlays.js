@@ -1,5 +1,6 @@
 (() => {
   const CHARACTER_LAYOUT_KEY = 'things-of-the-past-character-layout-v1';
+  const GEOMETRY_KEYS = ['x', 'y', 'w', 'h', 'rotation', 'flipX'];
 
   const characterTypes = {
     'market-worker': {
@@ -24,12 +25,14 @@
       name: 'Работник рынка',
       dialogueId: 'market-worker-first',
       variantId: 'idle-seated',
-      x: 20.6,
-      y: 55.6,
-      w: 18.8,
-      h: 50,
-      rotation: 0,
-      flipX: false,
+      variantLayouts: createVariantLayouts('market-worker', {
+        x: 20.6,
+        y: 55.6,
+        w: 18.8,
+        h: 50,
+        rotation: 0,
+        flipX: false
+      }),
       visible: true,
       requiresCase: 'lyublino-1994'
     }
@@ -48,6 +51,68 @@
     return JSON.parse(JSON.stringify(value));
   }
 
+  function defaultGeometry() {
+    return {
+      x: 50,
+      y: 55,
+      w: 18,
+      h: 42,
+      rotation: 0,
+      flipX: false
+    };
+  }
+
+  function geometryFrom(record, fallback = defaultGeometry()) {
+    return {
+      x: Number.isFinite(Number(record?.x)) ? Number(record.x) : fallback.x,
+      y: Number.isFinite(Number(record?.y)) ? Number(record.y) : fallback.y,
+      w: Number.isFinite(Number(record?.w)) ? Number(record.w) : fallback.w,
+      h: Number.isFinite(Number(record?.h)) ? Number(record.h) : fallback.h,
+      rotation: Number.isFinite(Number(record?.rotation)) ? Number(record.rotation) : fallback.rotation,
+      flipX: typeof record?.flipX === 'boolean' ? record.flipX : fallback.flipX
+    };
+  }
+
+  function createVariantLayouts(type, geometry = defaultGeometry()) {
+    const definition = characterTypes[type] || characterTypes['market-worker'];
+    return Object.fromEntries(definition.variants.map(variant => [variant.id, clone(geometry)]));
+  }
+
+  function normalizeCharacter(record, base = null) {
+    const type = characterTypes[record?.type] ? record.type : (characterTypes[base?.type] ? base.type : 'market-worker');
+    const definition = characterTypes[type];
+    const validVariantIds = new Set(definition.variants.map(variant => variant.id));
+    const fallbackVariantId = definition.variants[0].id;
+    const variantId = validVariantIds.has(record?.variantId)
+      ? record.variantId
+      : (validVariantIds.has(base?.variantId) ? base.variantId : fallbackVariantId);
+
+    const baseGeometry = geometryFrom(base, defaultGeometry());
+    const legacyGeometry = geometryFrom(record, baseGeometry);
+    const hasLegacyGeometry = GEOMETRY_KEYS.some(key => Object.prototype.hasOwnProperty.call(record || {}, key));
+    const baseLayouts = base?.variantLayouts || {};
+    const savedLayouts = record?.variantLayouts || {};
+    const variantLayouts = {};
+
+    for (const variant of definition.variants) {
+      const seed = hasLegacyGeometry
+        ? legacyGeometry
+        : geometryFrom(baseLayouts[variant.id], baseGeometry);
+      variantLayouts[variant.id] = geometryFrom(savedLayouts[variant.id], seed);
+    }
+
+    const normalized = {
+      ...(base ? clone(base) : {}),
+      ...(record ? clone(record) : {}),
+      type,
+      variantId,
+      variantLayouts
+    };
+
+    GEOMETRY_KEYS.forEach(key => delete normalized[key]);
+    return normalized;
+  }
+
   function readSavedCharacters() {
     try {
       const parsed = JSON.parse(localStorage.getItem(CHARACTER_LAYOUT_KEY) || 'null');
@@ -59,12 +124,30 @@
 
   function mergeSavedCharacters() {
     const saved = readSavedCharacters();
-    if (!saved) return clone(baseCharacters);
+    const normalizedBase = baseCharacters.map(character => normalizeCharacter(character));
+    if (!saved) return normalizedBase;
 
-    const byId = new Map(baseCharacters.map(character => [character.id, clone(character)]));
-    saved.forEach(character => {
-      if (!character?.id) return;
-      byId.set(character.id, { ...(byId.get(character.id) || defaultCharacter(character.type)), ...character });
+    const byId = new Map(normalizedBase.map(character => [character.id, character]));
+    saved.forEach(savedCharacter => {
+      if (!savedCharacter?.id) return;
+      const base = byId.get(savedCharacter.id) || null;
+      const fallback = base || defaultCharacter(savedCharacter.type);
+      const merged = {
+        ...clone(fallback),
+        ...clone(savedCharacter),
+        variantLayouts: {
+          ...(fallback.variantLayouts || {}),
+          ...(savedCharacter.variantLayouts || {})
+        }
+      };
+
+      // Old v1 records kept one shared x/y/w/h transform. Seed every frame
+      // from that transform once, then all frames become independent.
+      if (!savedCharacter.variantLayouts && GEOMETRY_KEYS.some(key => Object.prototype.hasOwnProperty.call(savedCharacter, key))) {
+        merged.variantLayouts = createVariantLayouts(merged.type, geometryFrom(savedCharacter, activeGeometry(fallback)));
+      }
+
+      byId.set(savedCharacter.id, normalizeCharacter(merged, fallback));
     });
     return Array.from(byId.values());
   }
@@ -76,13 +159,15 @@
 
   function serializableCharacter(character) {
     const { requiresCase, ...record } = character;
-    return record;
+    const result = clone(record);
+    GEOMETRY_KEYS.forEach(key => delete result[key]);
+    return result;
   }
 
   function defaultCharacter(type = 'market-worker') {
     const definition = characterTypes[type] || characterTypes['market-worker'];
     const variant = definition.variants[0];
-    return {
+    return normalizeCharacter({
       id: `npc-${Date.now().toString(36)}`,
       type,
       roomId: currentRoomId,
@@ -90,13 +175,30 @@
       name: definition.defaultName,
       dialogueId: definition.dialogueId,
       variantId: variant.id,
-      x: 50,
-      y: 55,
-      w: 18,
-      h: 42,
-      rotation: 0,
-      flipX: false,
+      variantLayouts: createVariantLayouts(type, defaultGeometry()),
       visible: true
+    });
+  }
+
+  function rawGet(id) {
+    return characters.find(character => character.id === id) || null;
+  }
+
+  function activeGeometry(character, variantId = character?.variantId) {
+    if (!character) return defaultGeometry();
+    const definition = characterTypes[character.type] || characterTypes['market-worker'];
+    const fallbackId = definition.variants[0].id;
+    const id = definition.variants.some(variant => variant.id === variantId) ? variantId : fallbackId;
+    if (!character.variantLayouts) character.variantLayouts = createVariantLayouts(character.type, defaultGeometry());
+    if (!character.variantLayouts[id]) character.variantLayouts[id] = clone(defaultGeometry());
+    return character.variantLayouts[id];
+  }
+
+  function publicCharacter(character) {
+    if (!character) return null;
+    return {
+      ...clone(character),
+      ...clone(activeGeometry(character))
     };
   }
 
@@ -125,52 +227,53 @@
 
   function renderCharacters() {
     layer.innerHTML = '';
-    for (const character of currentCharacters(true)) {
-      const hidden = isCharacterHidden(character);
-      const variant = characterVariant(character);
+    for (const rawCharacter of currentCharacters(true)) {
+      const character = publicCharacter(rawCharacter);
+      const hidden = isCharacterHidden(rawCharacter);
+      const variant = characterVariant(rawCharacter);
       const button = document.createElement('button');
       button.className = 'scene-character';
       button.type = 'button';
-      button.dataset.characterId = character.id;
-      button.dataset.dialogueId = character.dialogueId || '';
+      button.dataset.characterId = rawCharacter.id;
+      button.dataset.dialogueId = rawCharacter.dialogueId || '';
       button.dataset.variantId = variant.id;
-      button.setAttribute('aria-label', character.name);
+      button.setAttribute('aria-label', rawCharacter.name);
       button.hidden = hidden && !game.classList.contains('is-character-debug');
-      button.classList.toggle('is-selected', character.id === selectedCharacterId);
+      button.classList.toggle('is-selected', rawCharacter.id === selectedCharacterId);
       button.classList.toggle('is-hidden-character', hidden);
       applyGeometry(button, character);
       button.innerHTML = `
         <span class="scene-character__sprite" aria-hidden="true">
           <img src="${variant.sprite}" alt="" draggable="false" />
         </span>
-        <span class="scene-character__label">${escapeHtml(character.name)}</span>
+        <span class="scene-character__label">${escapeHtml(rawCharacter.name)}</span>
         <span class="scene-character__resize" data-character-handle="resize" aria-hidden="true"></span>
         <span class="scene-character__rotate" data-character-handle="rotate" aria-hidden="true"></span>
       `;
-      button.addEventListener('pointerdown', event => beginCharacterPointer(event, character, button));
+      button.addEventListener('pointerdown', event => beginCharacterPointer(event, rawCharacter, button));
       button.addEventListener('click', event => {
         if (game.classList.contains('is-character-debug')) {
           event.preventDefault();
           event.stopPropagation();
-          selectCharacter(character.id);
+          selectCharacter(rawCharacter.id);
           return;
         }
 
         event.preventDefault();
         event.stopPropagation();
-        if (character.dialogueId) window.DialogueSystem?.open?.(character.dialogueId);
+        if (rawCharacter.dialogueId) window.DialogueSystem?.open?.(rawCharacter.dialogueId);
       });
       layer.appendChild(button);
     }
   }
 
-  function applyGeometry(element, character) {
-    element.style.setProperty('--character-x', `${character.x}%`);
-    element.style.setProperty('--character-y', `${character.y}%`);
-    element.style.setProperty('--character-w', `${character.w}%`);
-    element.style.setProperty('--character-h', `${character.h}%`);
-    element.style.setProperty('--character-rotation', `${character.rotation || 0}deg`);
-    element.style.setProperty('--character-flip', character.flipX ? '-1' : '1');
+  function applyGeometry(element, geometry) {
+    element.style.setProperty('--character-x', `${geometry.x}%`);
+    element.style.setProperty('--character-y', `${geometry.y}%`);
+    element.style.setProperty('--character-w', `${geometry.w}%`);
+    element.style.setProperty('--character-h', `${geometry.h}%`);
+    element.style.setProperty('--character-rotation', `${geometry.rotation || 0}deg`);
+    element.style.setProperty('--character-flip', geometry.flipX ? '-1' : '1');
   }
 
   function beginCharacterPointer(event, character, element) {
@@ -181,16 +284,18 @@
 
     const rect = layer.getBoundingClientRect();
     const handle = event.target.closest('[data-character-handle]')?.dataset.characterHandle || 'move';
+    const geometry = clone(activeGeometry(character));
     dragState = {
       id: character.id,
+      variantId: character.variantId,
       element,
       handle,
       rect,
       startX: event.clientX,
       startY: event.clientY,
-      start: clone(character),
-      centerX: rect.left + rect.width * character.x / 100,
-      centerY: rect.top + rect.height * character.y / 100,
+      start: geometry,
+      centerX: rect.left + rect.width * geometry.x / 100,
+      centerY: rect.top + rect.height * geometry.y / 100,
       pointerId: event.pointerId
     };
     element.setPointerCapture?.(event.pointerId);
@@ -199,24 +304,25 @@
 
   function onPointerMove(event) {
     if (!dragState) return;
-    const character = get(dragState.id);
-    if (!character) return;
+    const character = rawGet(dragState.id);
+    if (!character || character.variantId !== dragState.variantId) return;
+    const geometry = activeGeometry(character, dragState.variantId);
     const dx = event.clientX - dragState.startX;
     const dy = event.clientY - dragState.startY;
 
     if (dragState.handle === 'resize') {
-      character.w = round(clamp(dragState.start.w + dx / dragState.rect.width * 100, 3, 80));
-      character.h = round(clamp(dragState.start.h + dy / dragState.rect.height * 100, 3, 90));
+      geometry.w = round(clamp(dragState.start.w + dx / dragState.rect.width * 100, 3, 80));
+      geometry.h = round(clamp(dragState.start.h + dy / dragState.rect.height * 100, 3, 90));
     } else if (dragState.handle === 'rotate') {
       const angle = Math.atan2(event.clientY - dragState.centerY, event.clientX - dragState.centerX) * 180 / Math.PI;
-      character.rotation = Math.round(angle + 90);
+      geometry.rotation = Math.round(angle + 90);
     } else {
-      character.x = round(clamp(dragState.start.x + dx / dragState.rect.width * 100, 0, 100));
-      character.y = round(clamp(dragState.start.y + dy / dragState.rect.height * 100, 0, 100));
+      geometry.x = round(clamp(dragState.start.x + dx / dragState.rect.width * 100, 0, 100));
+      geometry.y = round(clamp(dragState.start.y + dy / dragState.rect.height * 100, 0, 100));
     }
 
-    applyGeometry(dragState.element, character);
-    window.dispatchEvent(new CustomEvent('characters:preview', { detail: { character: clone(character) } }));
+    applyGeometry(dragState.element, geometry);
+    window.dispatchEvent(new CustomEvent('characters:preview', { detail: { character: publicCharacter(character) } }));
   }
 
   function onPointerUp() {
@@ -228,21 +334,17 @@
   }
 
   function list() {
-    return characters.map(character => clone(character));
+    return characters.map(character => publicCharacter(character));
   }
 
   function listCurrent(includeHidden = true) {
-    return currentCharacters(includeHidden).map(character => clone(character));
-  }
-
-  function get(id) {
-    return characters.find(character => character.id === id) || null;
+    return currentCharacters(includeHidden).map(character => publicCharacter(character));
   }
 
   function selectCharacter(id) {
     selectedCharacterId = id;
     renderCharacters();
-    window.dispatchEvent(new CustomEvent('characters:select', { detail: { id, character: clone(get(id)) } }));
+    window.dispatchEvent(new CustomEvent('characters:select', { detail: { id, character: publicCharacter(rawGet(id)) } }));
   }
 
   function addCharacter(type = 'market-worker') {
@@ -251,7 +353,7 @@
     selectedCharacterId = character.id;
     saveCharacters();
     renderCharacters();
-    return clone(character);
+    return publicCharacter(character);
   }
 
   function removeCharacter(id) {
@@ -264,30 +366,64 @@
   }
 
   function updateCharacter(id, patch) {
-    const character = get(id);
+    const character = rawGet(id);
     if (!character) return null;
-    Object.assign(character, patch);
+
     if (!characterTypes[character.type]) character.type = 'market-worker';
     const variants = characterTypes[character.type].variants;
-    if (!variants.some(variant => variant.id === character.variantId)) character.variantId = variants[0].id;
+    const previousVariantId = character.variantId;
+    const requestedVariantId = variants.some(variant => variant.id === patch.variantId)
+      ? patch.variantId
+      : previousVariantId;
+    const variantChanged = requestedVariantId !== previousVariantId;
+
+    const metadataPatch = { ...patch };
+    GEOMETRY_KEYS.forEach(key => delete metadataPatch[key]);
+    delete metadataPatch.variantId;
+    Object.assign(character, metadataPatch);
+
+    if (variantChanged) {
+      // F2 still contains coordinates of the old frame at the exact moment the
+      // select changes. Ignore those stale values and only switch the frame.
+      character.variantId = requestedVariantId;
+    } else {
+      const geometry = activeGeometry(character, previousVariantId);
+      GEOMETRY_KEYS.forEach(key => {
+        if (Object.prototype.hasOwnProperty.call(patch, key)) geometry[key] = patch[key];
+      });
+    }
+
     saveCharacters();
     renderCharacters();
-    return clone(character);
+    return publicCharacter(character);
+  }
+
+  function setVariant(id, variantId) {
+    const character = rawGet(id);
+    if (!character) return null;
+    const variants = characterTypes[character.type]?.variants || characterTypes['market-worker'].variants;
+    if (!variants.some(variant => variant.id === variantId)) return publicCharacter(character);
+    character.variantId = variantId;
+    saveCharacters();
+    renderCharacters();
+    return publicCharacter(character);
   }
 
   function resetCharacter(id) {
     const base = baseCharacters.find(character => character.id === id);
-    const character = get(id);
+    const character = rawGet(id);
     if (!character) return null;
-    Object.assign(character, clone(base || defaultCharacter(character.type)));
-    character.id = id;
+    const replacement = normalizeCharacter(base || defaultCharacter(character.type));
+    replacement.id = id;
+    const index = characters.findIndex(item => item.id === id);
+    characters[index] = replacement;
     saveCharacters();
     renderCharacters();
-    return clone(character);
+    return publicCharacter(replacement);
   }
 
   function resetAll() {
-    characters = clone(baseCharacters);
+    characters = baseCharacters.map(character => normalizeCharacter(character));
     selectedCharacterId = currentCharacters(true)[0]?.id || characters[0]?.id || null;
     saveCharacters();
     renderCharacters();
@@ -339,16 +475,19 @@
     variantsFor,
     list,
     listCurrent,
-    get: id => clone(get(id)),
+    get: id => publicCharacter(rawGet(id)),
     selectedId: () => selectedCharacterId,
     select: selectCharacter,
     add: addCharacter,
     remove: removeCharacter,
     update: updateCharacter,
+    setVariant,
     reset: resetCharacter,
     resetAll,
     render: renderCharacters
   };
 
+  // Persist the migrated per-frame schema once after loading old shared-layout saves.
+  saveCharacters();
   renderCharacters();
 })();
