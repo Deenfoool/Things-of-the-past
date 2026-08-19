@@ -51,6 +51,61 @@
       </button>
     </nav>
 
+    <aside class="hotspot-editor" id="hotspotEditor" aria-hidden="true">
+      <div class="hotspot-editor__header">
+        <div>
+          <strong>Редактор зон</strong>
+          <span>F2 — закрыть</span>
+        </div>
+        <button class="hotspot-editor__close" id="editorClose" type="button" aria-label="Закрыть редактор">×</button>
+      </div>
+
+      <div class="hotspot-editor__scene">
+        <span id="editorRoomName">Комната</span>
+        <strong id="editorSceneName">Стена</strong>
+        <small id="editorSceneFile">file.png</small>
+      </div>
+
+      <label class="hotspot-editor__field">
+        <span>Зоны на этой стене</span>
+        <select id="editorZoneSelect"></select>
+      </label>
+
+      <div class="hotspot-editor__actions hotspot-editor__actions--top">
+        <button id="editorCreate" type="button">+ Новая зона</button>
+        <button id="editorDelete" type="button" class="is-danger">Удалить</button>
+      </div>
+
+      <label class="hotspot-editor__field">
+        <span>Название зоны</span>
+        <input id="editorZoneName" type="text" autocomplete="off" />
+      </label>
+
+      <div class="hotspot-editor__coords">
+        <label><span>X</span><input id="editorX" type="number" min="0" max="100" step="0.1" /></label>
+        <label><span>Y</span><input id="editorY" type="number" min="0" max="100" step="0.1" /></label>
+        <label><span>W</span><input id="editorW" type="number" min="1" max="100" step="0.1" /></label>
+        <label><span>H</span><input id="editorH" type="number" min="1" max="100" step="0.1" /></label>
+      </div>
+
+      <p class="hotspot-editor__hint">Перетаскивай рамку мышью. Квадрат в правом нижнем углу меняет размер.</p>
+
+      <div class="hotspot-editor__actions">
+        <button id="editorCopyZone" type="button">Скопировать зону</button>
+        <button id="editorCopyWall" type="button">Скопировать стену</button>
+      </div>
+
+      <label class="hotspot-editor__field">
+        <span>Текст для отправки мне</span>
+        <textarea id="editorExport" rows="7" readonly></textarea>
+      </label>
+
+      <div class="hotspot-editor__footer">
+        <button id="editorResetWall" type="button">Сбросить стену</button>
+        <span id="editorStatus" role="status" aria-live="polite">Изменения сохраняются в браузере</span>
+      </div>
+    </aside>
+
     <div class="modal" id="modal" aria-hidden="true">
       <button class="modal__backdrop" id="modalBackdrop" type="button" aria-label="Закрыть окно"></button>
       <section class="modal__card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
@@ -66,7 +121,7 @@
         <strong>Управление</strong>
         <span>← → / A D — повернуться</span>
         <span>Клик — взаимодействовать</span>
-        <span>F2 — показать точки интереса</span>
+        <span>F2 — редактор точек интереса</span>
         <span>Esc — закрыть окно</span>
       </div>
     </div>
