@@ -46,6 +46,16 @@
     return localStorage.getItem(CASE_ACTIVE_KEY) === CASE_ID;
   }
 
+  function caseState() {
+    return window.InvestigationState?.syncLegacyCase?.() || window.InvestigationState?.get?.() || {
+      facts: [],
+      people: [],
+      evidence: [],
+      locations: [],
+      timeline: []
+    };
+  }
+
   function openUi(mode) {
     if (typeof debugHotspots !== 'undefined' && debugHotspots) return;
     overlay.classList.add('is-open');
@@ -149,6 +159,16 @@
   }
 
   function caseSummaryHtml() {
+    const state = caseState();
+    const victim = state.people.find(item => item.id === 'victim-unknown');
+    const wounded = state.people.find(item => item.id === 'wounded-unknown');
+    const victimText = victim?.status === 'observed'
+      ? '1 человек · обнаружен, личность пока не установлена'
+      : '1 человек · личность пока не установлена';
+    const woundedText = wounded?.name
+      ? `1 человек · ${escapeHtml(wounded.name)}`
+      : '1 человек · личность пока не установлена';
+
     return `
       ${sectionHeading('Первичная сводка', caseData.title, 'В папке отображается только то, что следователь уже получил официально. Неустановленные сведения намеренно остаются пустыми.')}
       <dl class="case-facts">
@@ -156,8 +176,8 @@
         <div><dt>Время</dt><dd>${caseData.time}</dd></div>
         <div><dt>Место</dt><dd>${caseData.location}</dd></div>
         <div><dt>Тип события</dt><dd>Стрельба</dd></div>
-        <div><dt>Погибшие</dt><dd>1 человек · личность пока не установлена</dd></div>
-        <div><dt>Раненые</dt><dd>1 человек · личность пока не установлена</dd></div>
+        <div><dt>Погибшие</dt><dd>${victimText}</dd></div>
+        <div><dt>Раненые</dt><dd>${woundedText}</dd></div>
       </dl>
       <div class="paper-note">
         <strong>Сообщение дежурного</strong>
@@ -170,11 +190,19 @@
   }
 
   function casePeopleHtml() {
+    const state = caseState();
+    const knownPeople = state.people || [];
+    const establishedCount = knownPeople.filter(item => item.name).length;
+    const cards = knownPeople.map(item => {
+      const title = item.name || 'Личность не установлена';
+      const status = statusLabel(item.status) || 'Неизвестно';
+      return `<div class="unknown-card"><span>${escapeHtml(item.role || 'Лицо')}</span><strong>${escapeHtml(title)}</strong><small>${escapeHtml(item.note || status)}</small></div>`;
+    }).join('');
+
     return `
-      ${sectionHeading('Лица по делу', 'На данный момент установлено: 0', 'Карточки будут заполняться только после осмотра места, документов и разговоров со свидетелями.')}
+      ${sectionHeading('Лица по делу', `На данный момент установлено: ${establishedCount}`, 'Карточки будут заполняться только после осмотра места, документов и разговоров со свидетелями.')}
       <div class="unknown-grid">
-        <div class="unknown-card"><span>Погибший</span><strong>Личность не установлена</strong><small>Нужно установить на месте происшествия</small></div>
-        <div class="unknown-card"><span>Раненый</span><strong>Личность не установлена</strong><small>Нужно выяснить состояние и получить сведения</small></div>
+        ${cards}
         <div class="unknown-card"><span>Стрелявший</span><strong>Неизвестен</strong><small>Описание отсутствует</small></div>
         <div class="unknown-card"><span>Возможные свидетели</span><strong>Не установлены</strong><small>Поиск начнётся после выезда</small></div>
       </div>
@@ -182,6 +210,16 @@
   }
 
   function caseEvidenceHtml() {
+    const evidence = caseState().evidence || [];
+    if (evidence.length) {
+      return `
+        ${sectionHeading('Вещественные доказательства', `Зарегистрировано: ${evidence.length}`, 'Здесь отображаются только предметы, уже внесённые в материалы текущего дела.')}
+        <div class="unknown-grid">
+          ${evidence.map(item => `<div class="unknown-card"><span>${escapeHtml(item.kind || 'Улика')}</span><strong>${escapeHtml(item.title || item.id)}</strong><small>${escapeHtml(item.description || item.status || 'Зарегистрировано')}</small></div>`).join('')}
+        </div>
+      `;
+    }
+
     return `
       ${sectionHeading('Вещественные доказательства', 'Улик пока нет', 'До осмотра места происшествия нельзя считать никакой предмет или версию установленным фактом.')}
       <div class="empty-ledger">
@@ -193,16 +231,21 @@
   }
 
   function caseLocationsHtml() {
+    const locations = caseState().locations || [];
+    const openLocations = locations.filter(item => item.unlocked);
+
     return `
-      ${sectionHeading('Доступные места', 'Открыта 1 локация', 'Новые адреса будут появляться только после того, как следователь узнает о них в ходе расследования.')}
-      <div class="location-card is-open">
-        <div>
-          <span>Доступно</span>
-          <strong>${caseData.location}</strong>
-          <p>Место происшествия. Первичный осмотр ещё не проводился.</p>
+      ${sectionHeading('Доступные места', `Открыто: ${openLocations.length}`, 'Новые адреса будут появляться только после того, как следователь узнает о них в ходе расследования.')}
+      ${openLocations.map(location => `
+        <div class="location-card is-open">
+          <div>
+            <span>${location.visited ? 'Посещено' : 'Доступно'}</span>
+            <strong>${escapeHtml(location.title || caseData.location)}</strong>
+            <p>${location.visited ? 'Локация уже была открыта для осмотра.' : 'Место происшествия. Первичный осмотр ещё не проводился.'}</p>
+          </div>
+          <button class="desk-ui__primary" type="button" data-go-location>К двери выезда</button>
         </div>
-        <button class="desk-ui__primary" type="button" data-go-location>К двери выезда</button>
-      </div>
+      `).join('')}
       <div class="location-card is-locked">
         <div><span>Неизвестно</span><strong>Другие места</strong><p>Адреса появятся по мере получения новых фактов.</p></div>
       </div>
@@ -210,14 +253,20 @@
   }
 
   function caseTimelineHtml() {
+    const timeline = caseState().timeline || [];
+
     return `
-      ${sectionHeading('Хронология', 'Известен только исходный сигнал', 'Время и последовательность событий будут уточняться по документам и показаниям.')}
+      ${sectionHeading('Хронология', `Записей: ${timeline.length}`, 'Время и последовательность событий будут уточняться по документам и показаниям.')}
       <ol class="timeline-list">
-        <li><time>${caseData.date}, ${caseData.time}</time><strong>Сообщение о стрельбе</strong><p>Дежурная часть получает первичный сигнал с Люблинского рынка.</p></li>
+        ${timeline.map(item => `<li><time>${escapeHtml(item.time || '?')}</time><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.text || statusLabel(item.status))}</p></li>`).join('')}
         <li class="is-unknown"><time>?</time><strong>Что произошло до вызова</strong><p>Не установлено.</p></li>
         <li class="is-unknown"><time>?</time><strong>Что произошло после стрельбы</strong><p>Не установлено.</p></li>
       </ol>
     `;
+  }
+
+  function statusLabel(status) {
+    return ({ claim: 'Неподтверждённое сообщение', established: 'Установлено', unknown: 'Неизвестно', observed: 'Обнаружен', interviewed: 'Опрошен' })[status] || '';
   }
 
   function renderNotes() {
@@ -327,4 +376,8 @@
       closeUi();
     }
   }, true);
+
+  window.addEventListener('investigation:change', () => {
+    if (overlay.classList.contains('is-open') && isCaseActive()) renderActiveCaseTab();
+  });
 })();

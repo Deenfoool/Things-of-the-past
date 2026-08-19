@@ -6,6 +6,13 @@ const FIRST_CASE = {
 };
 
 const HOTSPOT_EDITS_KEY = 'things-of-the-past-hotspot-edits-v1';
+const GAME_SETTINGS_KEY = 'things-of-the-past-settings-v1';
+const SAVE_STARTED_KEY = 'things-of-the-past-save-started';
+
+const DIRECTOR_OFFICE_DESK_SCENES = {
+  clean: './assets/locations/lyublino-market/director-office/02-desk-zhdanov-clean.png',
+  forensic: './assets/locations/lyublino-market/director-office/02-desk-zhdanov-forensic.png'
+};
 
 const rooms = {
   office: {
@@ -192,6 +199,13 @@ const rooms = {
             text: 'Скамья пустует. Здесь могли ждать покупатели или работники рынка, но сейчас рядом никого нет.'
           },
           {
+            id: 'market-side-worker',
+            x: 17, y: 24, w: 17, h: 31,
+            title: 'Работник рынка',
+            action: 'dialog',
+            dialogId: 'market-worker-first'
+          },
+          {
             id: 'market-side-shutter',
             x: 38, y: 13, w: 26, h: 41,
             title: 'Закрытый роллет',
@@ -293,15 +307,78 @@ const rooms = {
         ]
       },
       {
-        src: './assets/locations/lyublino-market/director-office/02-desk.png',
+        src: DIRECTOR_OFFICE_DESK_SCENES.clean,
+        contentVariants: {
+          clean: DIRECTOR_OFFICE_DESK_SCENES.clean,
+          forensic: DIRECTOR_OFFICE_DESK_SCENES.forensic
+        },
         label: 'Рабочий стол',
         alt: 'Рабочий стол в кабинете директора рынка',
         hotspots: [
+          {
+            id: 'director-office-seated-victim',
+            x: 45, y: 43, w: 20, h: 29,
+            title: 'Сидящий мужчина',
+            action: 'discover',
+            repeatText: 'Положение погибшего уже зафиксировано в материалах. Личность всё ещё требует отдельного установления.',
+            discoveries: {
+              fact: {
+                id: 'victim-found-director-office',
+                title: 'Погибший обнаружен в кабинете директора',
+                status: 'established',
+                text: 'В кабинете директора рынка обнаружен погибший мужчина. Личность ещё не установлена.'
+              },
+              person: {
+                id: 'victim-unknown',
+                role: 'Погибший',
+                name: null,
+                status: 'observed',
+                note: 'Обнаружен в кабинете директора. Личность пока не установлена.'
+              },
+              timeline: {
+                id: 'victim-location-fixed',
+                time: '24 августа 1994, первичный выезд',
+                title: 'Зафиксировано место обнаружения погибшего',
+                status: 'established',
+                text: 'Погибший обнаружен в кабинете директора рынка.'
+              }
+            }
+          },
           {
             id: 'director-office-desk',
             x: 13, y: 63, w: 62, h: 27,
             title: 'Рабочий стол',
             text: 'На столе лежат папки, бумаги и канцелярия. Без отдельного осмотра документов нельзя делать выводы о личности владельца или мотивах.'
+          },
+          {
+            id: 'director-office-impact-traces',
+            x: 54, y: 35, w: 17, h: 20,
+            title: 'Следы выстрелов',
+            action: 'discover',
+            repeatText: 'Следы выстрелов уже сфотографированы и зарегистрированы как вещественное доказательство.',
+            discoveries: {
+              fact: {
+                id: 'shots-fired-inside-office',
+                title: 'Выстрелы произведены в кабинете директора',
+                status: 'established',
+                text: 'В зоне рабочего стола зафиксированы следы попаданий. Это подтверждает, что стрельба произошла внутри кабинета директора.'
+              },
+              evidence: {
+                id: 'bullet-impact-traces',
+                kind: 'Следы',
+                title: 'Следы выстрелов в кабинете',
+                description: 'Схема и фотографии повреждений стены и мебели у рабочего места директора.',
+                location: 'Кабинет директора Люблинского рынка',
+                status: 'на хранении'
+              },
+              timeline: {
+                id: 'impact-traces-fixed',
+                time: '24 августа 1994, осмотр кабинета',
+                title: 'Зарегистрированы следы выстрелов',
+                status: 'established',
+                text: 'Следы попаданий внесены в материалы как вещественное доказательство.'
+              }
+            }
           },
           {
             id: 'director-office-phone',
@@ -597,8 +674,11 @@ hotspotEditor.setAttribute('aria-hidden', String(!debugHotspots));
 
 for (const room of Object.values(rooms)) {
   for (const scene of room.scenes) {
-    const image = new Image();
-    image.src = scene.src;
+    const sources = new Set([scene.src, ...Object.values(scene.contentVariants || {})]);
+    sources.forEach(src => {
+      const image = new Image();
+      image.src = src;
+    });
   }
 }
 
@@ -612,6 +692,26 @@ function currentScene() {
 
 function currentHotspot() {
   return currentScene().hotspots?.find(item => item.id === selectedHotspotId) || null;
+}
+
+function readGameSettings() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(GAME_SETTINGS_KEY) || '{}');
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function allowMatureContent() {
+  return readGameSettings().matureContent === true;
+}
+
+function resolveSceneSrc(scene) {
+  if (!scene.contentVariants) return scene.src;
+  return allowMatureContent()
+    ? scene.contentVariants.forensic || scene.src
+    : scene.contentVariants.clean || scene.src;
 }
 
 function savePosition() {
@@ -641,7 +741,7 @@ function saveCurrentSceneHotspots() {
 function renderScene() {
   const room = currentRoom();
   const scene = currentScene();
-  currentImage.src = scene.src;
+  currentImage.src = resolveSceneSrc(scene);
   currentImage.alt = scene.alt;
   sceneLabel.textContent = scene.label;
   if (roomLabel) roomLabel.textContent = room.label;
@@ -778,7 +878,7 @@ function updateEditorPanel() {
 
   editorRoomName.textContent = room.label;
   editorSceneName.textContent = scene.label;
-  editorSceneFile.textContent = scene.src.replace('./', '');
+  editorSceneFile.textContent = resolveSceneSrc(scene).replace('./', '');
 
   editorZoneSelect.innerHTML = '';
   if (!hotspots.length) {
@@ -918,7 +1018,7 @@ function buildZoneExport(item) {
   return [
     `Комната: ${room.label}`,
     `Стена: ${scene.label}`,
-    `Файл: ${scene.src.replace('./', '')}`,
+    `Файл: ${resolveSceneSrc(scene).replace('./', '')}`,
     `Зона: ${item.title}`,
     `ID: ${item.id}`,
     `Положение: x=${roundCoord(item.x)}%, y=${roundCoord(item.y)}%, w=${roundCoord(item.w)}%, h=${roundCoord(item.h)}%`
@@ -932,7 +1032,7 @@ function buildWallExport() {
   const lines = [
     `Комната: ${room.label}`,
     `Стена: ${scene.label}`,
-    `Файл: ${scene.src.replace('./', '')}`,
+    `Файл: ${resolveSceneSrc(scene).replace('./', '')}`,
     `Зон: ${hotspots.length}`,
     ''
   ];
@@ -1012,7 +1112,46 @@ function activateHotspot(item) {
     return;
   }
 
+  if (item.action === 'discover') {
+    discoverHotspot(item);
+    return;
+  }
+
+  if (item.action === 'dialog') {
+    if (window.DialogueSystem?.open) {
+      window.DialogueSystem.open(item.dialogId);
+    } else {
+      openModal('Разговор', item.title, 'Система диалогов ещё загружается.');
+    }
+    return;
+  }
+
   openModal('Осмотр', item.title, item.text || 'Здесь появится интерактивное действие.');
+}
+
+function discoverHotspot(item) {
+  const state = window.InvestigationState?.syncLegacyCase?.() || window.InvestigationState?.get?.();
+  const discoveries = item.discoveries || {};
+  const alreadyKnown = discoveries.fact && state?.facts?.some(fact => fact.id === discoveries.fact.id);
+
+  if (!window.InvestigationState) {
+    openModal('Осмотр', item.title, item.text || 'Здесь появится интерактивное действие.');
+    return;
+  }
+
+  if (discoveries.fact) window.InvestigationState.addFact(discoveries.fact);
+  if (discoveries.person) window.InvestigationState.upsertPerson(discoveries.person);
+  if (discoveries.evidence) window.InvestigationState.addEvidence(discoveries.evidence);
+  if (discoveries.location) window.InvestigationState.unlockLocation(discoveries.location);
+  if (discoveries.timeline) window.InvestigationState.addTimeline(discoveries.timeline);
+
+  openModal(
+    alreadyKnown ? 'Осмотр' : 'Новый факт',
+    item.title,
+    alreadyKnown
+      ? item.repeatText || item.text || 'Это уже отражено в материалах дела.'
+      : discoveries.fact?.text || item.text || 'Новая информация добавлена в материалы дела.'
+  );
 }
 
 function talkToDutyOfficer() {
@@ -1069,6 +1208,8 @@ function openLocations() {
 }
 
 function rotate(direction) {
+  if (game.classList.contains('is-menu-open')) return;
+  if (document.querySelector('#dialogueUi.is-open')) return;
   if (isTurning || modal.classList.contains('is-open')) return;
   const room = currentRoom();
   const nextIndex = (currentIndex + direction + room.scenes.length) % room.scenes.length;
@@ -1076,6 +1217,7 @@ function rotate(direction) {
 }
 
 function changeRoom(roomId, index) {
+  if (document.querySelector('#dialogueUi.is-open')) return;
   if (!rooms[roomId] || isTurning || modal.classList.contains('is-open')) return;
   transitionTo(roomId, index, 1);
 }
@@ -1087,7 +1229,7 @@ function transitionTo(roomId, index, direction) {
 
   isTurning = true;
   hotspotsEl.style.pointerEvents = 'none';
-  nextImage.src = nextSceneData.src;
+  nextImage.src = resolveSceneSrc(nextSceneData);
   nextImage.alt = nextSceneData.alt;
 
   sceneEl.classList.add(direction > 0 ? 'is-turning-right' : 'is-turning-left');
@@ -1096,7 +1238,7 @@ function transitionTo(roomId, index, direction) {
   window.setTimeout(() => {
     currentRoomId = roomId;
     currentIndex = safeIndex;
-    currentImage.src = nextSceneData.src;
+    currentImage.src = resolveSceneSrc(nextSceneData);
     currentImage.alt = nextSceneData.alt;
     sceneEl.classList.remove('is-turning-right', 'is-turning-left');
     sceneLabel.textContent = nextSceneData.label;
@@ -1157,6 +1299,75 @@ function toggleDebugHotspots(forceValue) {
   updateEditorPanel();
   showObservation(debugHotspots ? 'Редактор точек интереса включён' : 'Редактор точек интереса закрыт');
 }
+
+function clearProgressStorage() {
+  Object.keys(localStorage).forEach(key => {
+    if (key.startsWith('things-of-the-past-') && key !== GAME_SETTINGS_KEY) {
+      localStorage.removeItem(key);
+    }
+  });
+}
+
+function restoreDefaultHotspots() {
+  for (const [roomId, room] of Object.entries(rooms)) {
+    room.scenes.forEach((scene, index) => {
+      const key = sceneStorageKey(roomId, index);
+      scene.hotspots = clone(baseHotspotsByScene[key] || scene.hotspots || []);
+    });
+  }
+}
+
+function resetRuntimeState() {
+  hotspotEdits = loadHotspotEdits();
+  restoreDefaultHotspots();
+  applySavedHotspotEdits();
+  currentRoomId = 'office';
+  currentIndex = 0;
+  caseActive = false;
+  isTurning = false;
+  selectedHotspotId = null;
+  debugHotspots = false;
+  game.classList.remove('is-debug');
+  hotspotEditor.setAttribute('aria-hidden', 'true');
+  closeModal();
+  help.classList.remove('is-open');
+  help.setAttribute('aria-hidden', 'true');
+  renderScene();
+  savePosition();
+}
+
+function startNewGame() {
+  clearProgressStorage();
+  window.InvestigationState?.reset();
+  localStorage.setItem(SAVE_STARTED_KEY, '1');
+  resetRuntimeState();
+}
+
+function continueGame() {
+  localStorage.setItem(SAVE_STARTED_KEY, '1');
+  renderScene();
+  savePosition();
+}
+
+function hasSaveGame() {
+  return localStorage.getItem(SAVE_STARTED_KEY) === '1'
+    || localStorage.getItem('things-of-the-past-case-active') === FIRST_CASE.id
+    || Boolean(localStorage.getItem('things-of-the-past-investigation-state-v1'));
+}
+
+function applyGameSettings() {
+  const settings = readGameSettings();
+  game.classList.toggle('is-reduced-motion', settings.motion === 'reduced');
+  renderScene();
+}
+
+window.ThingsGame = {
+  newGame: startNewGame,
+  continueGame,
+  hasSave: hasSaveGame,
+  applySettings: applyGameSettings,
+  settingsKey: GAME_SETTINGS_KEY
+};
 
 turnLeft.addEventListener('click', () => rotate(-1));
 turnRight.addEventListener('click', () => rotate(1));
@@ -1219,5 +1430,5 @@ sceneEl.addEventListener('touchend', event => {
   rotate(delta > 0 ? -1 : 1);
 }, { passive: true });
 
-renderScene();
+applyGameSettings();
 savePosition();

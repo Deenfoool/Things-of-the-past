@@ -93,6 +93,16 @@
     return localStorage.getItem(CASE_ACTIVE_KEY) === CASE_ID;
   }
 
+  function caseState() {
+    return window.InvestigationState?.syncLegacyCase?.() || window.InvestigationState?.get?.() || {
+      facts: [],
+      people: [],
+      evidence: [],
+      locations: [],
+      timeline: []
+    };
+  }
+
   function readJson(key, fallback) {
     try {
       const value = JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback));
@@ -125,12 +135,108 @@
   function allCards() {
     if (!isCaseActive()) return [];
     const positions = loadPositions();
-    const facts = systemCards.map(card => ({ ...card, ...(positions[card.id] || {}) }));
+    const state = caseState();
+    const dynamicFacts = investigationFactCards(state.facts || []);
+    const dynamicEvidence = investigationEvidenceCards(state.evidence || []);
+    const dynamicPeople = investigationPersonCards(state.people || []);
+    const facts = systemCards
+      .map(card => investigationOverride(card, state))
+      .concat(dynamicFacts)
+      .concat(dynamicEvidence)
+      .concat(dynamicPeople)
+      .map(card => ({ ...card, ...(positions[card.id] || {}) }));
     const versions = loadVersions().map((card, index) => ({
       kind: 'version', status: 'Версия следователя', tilt: index % 2 ? 1 : -1,
       ...card, ...(positions[card.id] || {})
     }));
     return [...facts, ...versions];
+  }
+
+  function investigationOverride(card, state) {
+    if (card.id === 'dead-unknown') {
+      const victim = state.people?.find(item => item.id === 'victim-unknown');
+      if (victim?.status === 'observed') {
+        return {
+          ...card,
+          text: victim.note || 'Обнаружен в кабинете директора.',
+          status: 'Обнаружен',
+          details: 'Положение погибшего зафиксировано при осмотре кабинета директора. Личность пока не установлена.'
+        };
+      }
+    }
+
+    if (card.id === 'place-market') {
+      const market = state.locations?.find(item => item.id === 'lyublino-market');
+      if (market?.visited) {
+        return {
+          ...card,
+          status: 'Посещено',
+          details: 'Люблинский рынок открыт и уже посещался следователем.'
+        };
+      }
+    }
+
+    return card;
+  }
+
+  function investigationFactCards(facts) {
+    const starterIds = new Set(['incident-shooting', 'time-around-noon']);
+    return facts
+      .filter(fact => fact?.id && !starterIds.has(fact.id))
+      .map((fact, index) => ({
+        id: `fact-${fact.id}`,
+        kind: 'fact',
+        title: fact.title || 'Новый факт',
+        text: fact.text || '',
+        status: statusLabel(fact.status),
+        details: fact.text || statusLabel(fact.status),
+        x: clamp(19 + (index % 3) * 22, 8, 78),
+        y: clamp(58 + Math.floor(index / 3) * 13, 8, 78),
+        tilt: index % 2 ? 1 : -1,
+        source: 'investigation'
+      }));
+  }
+
+  function investigationEvidenceCards(evidence) {
+    return evidence
+      .filter(item => item?.id)
+      .map((item, index) => ({
+        id: `evidence-${item.id}`,
+        kind: 'evidence',
+        title: item.title || 'Улика',
+        text: item.description || item.location || '',
+        status: item.status || 'зарегистрировано',
+        details: [item.description, item.location ? `Место обнаружения: ${item.location}` : null].filter(Boolean).join('\n'),
+        x: clamp(12 + (index % 3) * 24, 8, 78),
+        y: clamp(78 - Math.floor(index / 3) * 13, 8, 78),
+        tilt: index % 2 ? -1 : 1,
+        source: 'investigation'
+      }));
+  }
+
+  function investigationPersonCards(people) {
+    const starterUnknownIds = new Set(['victim-unknown', 'wounded-unknown']);
+    return people
+      .filter(person => person?.id && !starterUnknownIds.has(person.id))
+      .map((person, index) => ({
+        id: `person-${person.id}`,
+        kind: 'person',
+        title: person.name || person.role || 'Лицо по делу',
+        text: person.note || statusLabel(person.status),
+        status: statusLabel(person.status) || person.role || '',
+        details: person.note || statusLabel(person.status),
+        x: clamp(66 + (index % 2) * 12, 8, 82),
+        y: clamp(68 + Math.floor(index / 2) * 12, 8, 78),
+        tilt: index % 2 ? 1 : -1,
+        source: 'investigation'
+      }));
+  }
+
+  function allLinks() {
+    const dynamicLinks = allCards()
+      .filter(card => card.source === 'investigation')
+      .map(card => ['incident', card.id]);
+    return [...links, ...dynamicLinks];
   }
 
   function syncBoardWall() {
@@ -249,7 +355,7 @@
     if (!isBoardWall() || !isCaseActive()) return;
 
     const boardRect = layer.getBoundingClientRect();
-    for (const [fromId, toId] of links) {
+    for (const [fromId, toId] of allLinks()) {
       const from = cardsLayer.querySelector(`[data-card-id="${CSS.escape(fromId)}"]`);
       const to = cardsLayer.querySelector(`[data-card-id="${CSS.escape(toId)}"]`);
       if (!from || !to) continue;
@@ -313,7 +419,11 @@
   }
 
   function kindLabel(kind) {
-    return ({ person: 'Лицо', place: 'Место', fact: 'Факт', question: 'Вопрос', version: 'Версия' })[kind] || 'Карточка';
+    return ({ person: 'Лицо', place: 'Место', fact: 'Факт', evidence: 'Улика', question: 'Вопрос', version: 'Версия' })[kind] || 'Карточка';
+  }
+
+  function statusLabel(status) {
+    return ({ claim: 'Неподтверждено', established: 'Установлено', corroborated: 'Подтверждено', unknown: 'Неизвестно', interviewed: 'Опрошен' })[status] || status || '';
   }
 
   function escapeHtml(value) {
@@ -354,6 +464,9 @@
   window.addEventListener('pointermove', onPointerMove);
   window.addEventListener('pointerup', onPointerUp);
   window.addEventListener('resize', () => requestAnimationFrame(drawLines));
+  window.addEventListener('investigation:change', () => {
+    if (isBoardWall()) renderBoard();
+  });
 
   const sceneObserver = new MutationObserver(() => requestAnimationFrame(syncBoardWall));
   sceneObserver.observe(currentImage, { attributes: true, attributeFilter: ['src'] });
