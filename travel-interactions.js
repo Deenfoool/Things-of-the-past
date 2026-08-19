@@ -7,9 +7,9 @@
       id: 'lyublino-market',
       title: 'Люблинский рынок',
       subtitle: 'Место происшествия',
-      roomId: null,
-      artReady: false,
-      description: 'Первичная локация текущего дела. Осмотр ещё не проводился.'
+      roomId: 'market-main',
+      artReady: true,
+      description: 'Первичная торговая зона рынка. Осмотр ещё не проводился.'
     }]
   ]);
 
@@ -83,7 +83,7 @@
     body.innerHTML = `
       <p class="travel-ui__intro">На карте отображаются только места, о которых следователь уже узнал по текущему делу.</p>
       ${locations.map(location => destinationHtml(location)).join('') || '<div class="travel-ui__empty"><strong>Нет доступных мест</strong></div>'}
-      <div class="travel-ui__notice">Система полевых локаций уже готова. Для Люблинского рынка в репозитории пока нет фоновых PNG, поэтому выезд не подменяется временной графикой.</div>
+      <div class="travel-ui__notice">Полевые локации открываются только после получения дела. Новые места будут добавляться сюда по мере расследования.</div>
     `;
 
     body.querySelectorAll('[data-travel-location]').forEach(button => {

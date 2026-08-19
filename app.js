@@ -12,7 +12,7 @@ const rooms = {
     label: 'Кабинет следователя',
     scenes: [
       {
-        src: './table.png',
+        src: './assets/rooms/office/table.png',
         label: 'Рабочий стол',
         alt: 'Рабочий стол следователя',
         hotspots: [
@@ -37,7 +37,7 @@ const rooms = {
         ]
       },
       {
-        src: './monitor.png',
+        src: './assets/rooms/office/monitor.png',
         label: 'Компьютер',
         alt: 'Компьютер в кабинете следователя',
         hotspots: [
@@ -62,7 +62,7 @@ const rooms = {
         ]
       },
       {
-        src: './board.png',
+        src: './assets/rooms/office/board.png',
         label: 'Доска расследования',
         alt: 'Доска расследования в кабинете',
         hotspots: [
@@ -75,7 +75,7 @@ const rooms = {
         ]
       },
       {
-        src: './door-corridor.png',
+        src: './assets/rooms/office/door-corridor.png',
         label: 'Дверь в коридор',
         alt: 'Дверь из кабинета следователя в коридор',
         hotspots: [
@@ -96,7 +96,7 @@ const rooms = {
     label: 'Коридор дежурной части',
     scenes: [
       {
-        src: './door-inside.png',
+        src: './assets/rooms/corridor/door-inside.png',
         label: 'Кабинет следователя',
         alt: 'Дверь в кабинет следователя из коридора',
         hotspots: [
@@ -111,7 +111,7 @@ const rooms = {
         ]
       },
       {
-        src: './officer-window.png',
+        src: './assets/rooms/corridor/officer-window.png',
         label: 'Окно дежурного',
         alt: 'Окно дежурного в коридоре',
         hotspots: [
@@ -124,7 +124,7 @@ const rooms = {
         ]
       },
       {
-        src: './evidence-storage.png',
+        src: './assets/rooms/corridor/evidence-storage.png',
         label: 'Комната улик',
         alt: 'Хранилище вещественных доказательств',
         hotspots: [
@@ -137,7 +137,7 @@ const rooms = {
         ]
       },
       {
-        src: './door-outside.png',
+        src: './assets/rooms/corridor/door-outside.png',
         label: 'Выезд на локацию',
         alt: 'Дверь для выезда на место происшествия',
         hotspots: [
@@ -146,6 +146,340 @@ const rooms = {
             x: 31, y: 7, w: 39, h: 86,
             title: 'Выезд на локацию',
             action: 'outside'
+          }
+        ]
+      }
+    ]
+  },
+
+  'market-main': {
+    label: 'Люблинский рынок',
+    scenes: [
+      {
+        src: './assets/locations/lyublino-market/market-main/01-main-stalls.png',
+        label: 'Основные прилавки',
+        alt: 'Основные торговые прилавки Люблинского рынка',
+        hotspots: [
+          {
+            id: 'market-main-counter',
+            x: 28, y: 45, w: 44, h: 35,
+            title: 'Центральный прилавок',
+            text: 'Прилавок уже осматривают поверхностно. Пока видно только обычную торговую обстановку: ящики, ткань, старые ёмкости и следы спешно оставленной работы.'
+          },
+          {
+            id: 'market-main-scales',
+            x: 49, y: 32, w: 13, h: 21,
+            title: 'Весы',
+            text: 'Старые торговые весы. Они не связаны с делом напрямую, но помогают понять, что место до происшествия работало в обычном режиме.'
+          },
+          {
+            id: 'market-main-notices',
+            x: 38, y: 16, w: 23, h: 18,
+            title: 'Объявления',
+            text: 'На доске висят объявления и служебные бумаги рынка. Текст разрозненный, без сведений, которые можно считать фактом по делу.'
+          }
+        ]
+      },
+      {
+        src: './assets/locations/lyublino-market/market-main/02-side-stalls.png',
+        label: 'Боковая торговая зона',
+        alt: 'Боковая торговая зона Люблинского рынка',
+        hotspots: [
+          {
+            id: 'market-side-bench',
+            x: 7, y: 52, w: 27, h: 22,
+            title: 'Скамья',
+            text: 'Скамья пустует. Здесь могли ждать покупатели или работники рынка, но сейчас рядом никого нет.'
+          },
+          {
+            id: 'market-side-shutter',
+            x: 38, y: 13, w: 26, h: 41,
+            title: 'Закрытый роллет',
+            text: 'Торговая точка закрыта. Нужно будет выяснить, кто работал рядом и мог видеть происходящее.'
+          },
+          {
+            id: 'market-side-crates',
+            x: 39, y: 63, w: 37, h: 26,
+            title: 'Ящики у прилавка',
+            text: 'Обычные рыночные ящики и тара. Следов явного значения для дела при первичном осмотре не видно.'
+          }
+        ]
+      },
+      {
+        src: './assets/locations/lyublino-market/market-main/03-administration-side.png',
+        label: 'Административная сторона',
+        alt: 'Административная сторона торговой зоны',
+        hotspots: [
+          {
+            id: 'market-admin-door',
+            x: 49, y: 15, w: 19, h: 70,
+            title: 'Дверь администрации',
+            action: 'room',
+            targetRoom: 'director-office',
+            targetIndex: 0
+          },
+          {
+            id: 'market-admin-window',
+            x: 28, y: 36, w: 16, h: 21,
+            title: 'Служебное окно',
+            text: 'Через такое окно могли передавать бумаги или ключи. Пока это только ориентир для дальнейшего осмотра.'
+          },
+          {
+            id: 'market-admin-board',
+            x: 13, y: 26, w: 18, h: 25,
+            title: 'Служебная доска',
+            text: 'На доске висят старые объявления и служебные листы. Ничего, что можно занести в материалы дела, пока не выделяется.'
+          }
+        ]
+      },
+      {
+        src: './assets/locations/lyublino-market/market-main/04-exit.png',
+        label: 'Проход к выходу',
+        alt: 'Проход к выходу с торговой зоны',
+        hotspots: [
+          {
+            id: 'market-to-yard',
+            x: 34, y: 12, w: 29, h: 73,
+            title: 'Выйти во двор рынка',
+            action: 'room',
+            targetRoom: 'market-yard',
+            targetIndex: 0
+          },
+          {
+            id: 'market-exit-threshold',
+            x: 41, y: 58, w: 18, h: 20,
+            title: 'Порог прохода',
+            text: 'Проход ведёт наружу, во внутренний двор рынка. Оттуда удобнее понять, где машина и служебные выходы.'
+          },
+          {
+            id: 'market-exit-crates',
+            x: 72, y: 52, w: 23, h: 32,
+            title: 'Ящики у выхода',
+            text: 'Ящики сложены у стены. При первичном взгляде они не дают новых сведений по делу.'
+          }
+        ]
+      }
+    ]
+  },
+
+  'director-office': {
+    label: 'Кабинет директора',
+    scenes: [
+      {
+        src: './assets/locations/lyublino-market/director-office/01-entry-door.png',
+        label: 'Дверь в администрацию',
+        alt: 'Дверь из кабинета директора в административную часть рынка',
+        hotspots: [
+          {
+            id: 'director-office-to-market',
+            x: 36, y: 7, w: 27, h: 86,
+            title: 'Вернуться к административной стороне',
+            action: 'room',
+            targetRoom: 'market-main',
+            targetIndex: 2
+          },
+          {
+            id: 'director-office-coat-rack',
+            x: 16, y: 20, w: 16, h: 57,
+            title: 'Вешалка',
+            text: 'Служебная одежда и старые вещи у двери. При первом осмотре ничего, что меняло бы картину дела, не видно.'
+          },
+          {
+            id: 'director-office-duty-window',
+            x: 66, y: 26, w: 15, h: 29,
+            title: 'Служебное окно',
+            text: 'Окно выходит в административную часть. Через него могли передавать бумаги или разговаривать с работниками.'
+          }
+        ]
+      },
+      {
+        src: './assets/locations/lyublino-market/director-office/02-desk.png',
+        label: 'Рабочий стол',
+        alt: 'Рабочий стол в кабинете директора рынка',
+        hotspots: [
+          {
+            id: 'director-office-desk',
+            x: 13, y: 63, w: 62, h: 27,
+            title: 'Рабочий стол',
+            text: 'На столе лежат папки, бумаги и канцелярия. Без отдельного осмотра документов нельзя делать выводы о личности владельца или мотивах.'
+          },
+          {
+            id: 'director-office-phone',
+            x: 13, y: 56, w: 17, h: 16,
+            title: 'Телефон',
+            text: 'Стационарный телефон на рабочем столе. Журнал звонков или показания сотрудников могут позже придать ему значение.'
+          },
+          {
+            id: 'director-office-wall-portrait',
+            x: 58, y: 20, w: 9, h: 17,
+            title: 'Портрет на стене',
+            text: 'Старый портрет в рамке. По нему нельзя официально установить личность погибшего.'
+          },
+          {
+            id: 'director-office-window',
+            x: 84, y: 11, w: 14, h: 45,
+            title: 'Окно',
+            text: 'Окно выходит к территории рынка. Свет хороший, но с этой позиции не видно внешние ряды целиком.'
+          }
+        ]
+      },
+      {
+        src: './assets/locations/lyublino-market/director-office/03-records.png',
+        label: 'Документы и сейф',
+        alt: 'Шкафы, сейф и документы в кабинете директора',
+        hotspots: [
+          {
+            id: 'director-office-file-cabinets',
+            x: 16, y: 24, w: 27, h: 61,
+            title: 'Картотека',
+            text: 'Металлические шкафы с документами. Понадобится отдельный допуск или основание для детального просмотра.'
+          },
+          {
+            id: 'director-office-safe',
+            x: 39, y: 45, w: 16, h: 36,
+            title: 'Сейф',
+            text: 'Сейф закрыт. Его содержимое пока неизвестно и не должно считаться установленным фактом.'
+          },
+          {
+            id: 'director-office-record-shelves',
+            x: 70, y: 13, w: 29, h: 72,
+            title: 'Папки и журналы',
+            text: 'На полках много служебных папок и журналов. Нужен осмотр документов, чтобы выделить значимые материалы.'
+          }
+        ]
+      },
+      {
+        src: './assets/locations/lyublino-market/director-office/04-incident-area.png',
+        label: 'Место осмотра',
+        alt: 'Нейтрально обозначенное место осмотра в кабинете директора',
+        hotspots: [
+          {
+            id: 'director-office-covered-form',
+            x: 71, y: 70, w: 28, h: 24,
+            title: 'Накрытая фигура',
+            text: 'Фигура накрыта тканью. Это место требует отдельного процессуального осмотра; личность погибшего пока не установлена в материалах игрока.'
+          },
+          {
+            id: 'director-office-fallen-chair',
+            x: 47, y: 70, w: 18, h: 18,
+            title: 'Опрокинутый стул',
+            text: 'Стул лежит на боку. Пока это только наблюдение об обстановке, а не доказанная последовательность событий.'
+          },
+          {
+            id: 'director-office-side-table',
+            x: 13, y: 50, w: 21, h: 27,
+            title: 'Тумба с бумагами',
+            text: 'На тумбе лежат бумаги и мелкие предметы. Их значение станет ясно только после детального осмотра.'
+          }
+        ]
+      }
+    ]
+  },
+
+  'market-yard': {
+    label: 'Двор Люблинского рынка',
+    scenes: [
+      {
+        src: './assets/locations/lyublino-market/market-yard/01-back-to-market.png',
+        label: 'Вход в торговый зал',
+        alt: 'Двор рынка у входа в торговый зал',
+        hotspots: [
+          {
+            id: 'yard-to-market-main',
+            x: 39, y: 17, w: 23, h: 60,
+            title: 'Вернуться в торговую зону',
+            action: 'room',
+            targetRoom: 'market-main',
+            targetIndex: 3
+          },
+          {
+            id: 'yard-handcarts',
+            x: 5, y: 50, w: 24, h: 30,
+            title: 'Тележки',
+            text: 'Старые тележки для ящиков и товара. Их положение выглядит обычным для хозяйственного двора.'
+          },
+          {
+            id: 'yard-crates-market-door',
+            x: 72, y: 48, w: 24, h: 29,
+            title: 'Ящики у входа',
+            text: 'Ящики сложены у стены, рядом с дверью в торговый зал. При первичном осмотре ничего явно важного не видно.'
+          }
+        ]
+      },
+      {
+        src: './assets/locations/lyublino-market/market-yard/02-storage-side.png',
+        label: 'Хозяйственная сторона',
+        alt: 'Хозяйственная сторона двора рынка',
+        hotspots: [
+          {
+            id: 'yard-storage-doors',
+            x: 32, y: 20, w: 31, h: 59,
+            title: 'Складские двери',
+            text: 'Складские двери закрыты. Нужно будет выяснить, кто имел доступ к этой части двора.'
+          },
+          {
+            id: 'yard-notice-board',
+            x: 11, y: 23, w: 16, h: 28,
+            title: 'Доска объявлений',
+            text: 'Бумаги выцвели и частично размокли. С первого взгляда здесь нет сведений, которые можно внести в дело.'
+          },
+          {
+            id: 'yard-covered-crates',
+            x: 68, y: 51, w: 19, h: 27,
+            title: 'Накрытые ящики',
+            text: 'Ящики укрыты брезентом. Это больше похоже на обычное хранение товара, чем на отдельную улику.'
+          }
+        ]
+      },
+      {
+        src: './assets/locations/lyublino-market/market-yard/03-service-gate.png',
+        label: 'Служебные ворота',
+        alt: 'Служебные ворота двора рынка',
+        hotspots: [
+          {
+            id: 'yard-service-gate',
+            x: 31, y: 15, w: 43, h: 61,
+            title: 'Ворота',
+            text: 'Ворота выходят к внешним рядам рынка. Пока нельзя утверждать, связан ли этот проход с происшествием.'
+          },
+          {
+            id: 'yard-gate-cart',
+            x: 18, y: 48, w: 11, h: 29,
+            title: 'Ручная тележка',
+            text: 'Тележка стоит у ворот. Следов свежего использования при беглом осмотре не видно.'
+          },
+          {
+            id: 'yard-gate-view',
+            x: 38, y: 26, w: 25, h: 21,
+            title: 'Внешние ряды',
+            text: 'За воротами видны торговые ряды. Это возможное направление для дальнейшего осмотра, если появятся основания.'
+          }
+        ]
+      },
+      {
+        src: './assets/locations/lyublino-market/market-yard/04-car-exit.png',
+        label: 'Выезд со двора',
+        alt: 'Выезд со двора рынка к служебной машине',
+        hotspots: [
+          {
+            id: 'yard-to-corridor',
+            x: 0, y: 36, w: 25, h: 40,
+            title: 'Уехать в дежурную часть',
+            action: 'room',
+            targetRoom: 'corridor',
+            targetIndex: 3
+          },
+          {
+            id: 'yard-open-gate',
+            x: 23, y: 26, w: 24, h: 43,
+            title: 'Открытые ворота',
+            text: 'Через ворота можно выехать со двора. Сейчас это путь обратно к дежурной части.'
+          },
+          {
+            id: 'yard-car-crates',
+            x: 59, y: 55, w: 22, h: 22,
+            title: 'Ящики у стены',
+            text: 'Пустая тара у стены. Ничего, что меняло бы картину происшествия, пока не найдено.'
           }
         ]
       }
