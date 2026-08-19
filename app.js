@@ -8,6 +8,28 @@ const FIRST_CASE = {
 const HOTSPOT_EDITS_KEY = 'things-of-the-past-hotspot-edits-v1';
 const GAME_SETTINGS_KEY = 'things-of-the-past-settings-v1';
 const SAVE_STARTED_KEY = 'things-of-the-past-save-started';
+const PLAYER_SAVE_KEYS = new Set([
+  'things-of-the-past-room-id',
+  'things-of-the-past-case-active',
+  'things-of-the-past-case-brief-read',
+  'things-of-the-past-investigator-notes-v1',
+  'things-of-the-past-investigation-state-v1',
+  'things-of-the-past-board-positions-v2',
+  'things-of-the-past-board-versions-v2',
+  'things-of-the-past-dialogue-asked-v1',
+  SAVE_STARTED_KEY
+]);
+const PLAYER_SAVE_PREFIXES = [
+  'things-of-the-past-view-'
+];
+const DEVELOPER_STORAGE_KEYS = new Set([
+  HOTSPOT_EDITS_KEY,
+  'things-of-the-past-hotspot-layout-version',
+  'things-of-the-past-debug-hotspots'
+]);
+const DEVELOPER_STORAGE_PREFIXES = [
+  'things-of-the-past-hotspot-'
+];
 
 const DIRECTOR_OFFICE_DESK_SCENES = {
   clean: './assets/locations/lyublino-market/director-office/02-desk-zhdanov-clean.png',
@@ -199,13 +221,6 @@ const rooms = {
             text: 'Скамья пустует. Здесь могли ждать покупатели или работники рынка, но сейчас рядом никого нет.'
           },
           {
-            id: 'market-side-worker',
-            x: 17, y: 24, w: 17, h: 31,
-            title: 'Работник рынка',
-            action: 'dialog',
-            dialogId: 'market-worker-first'
-          },
-          {
             id: 'market-side-shutter',
             x: 38, y: 13, w: 26, h: 41,
             title: 'Закрытый роллет',
@@ -354,31 +369,7 @@ const rooms = {
             id: 'director-office-impact-traces',
             x: 54, y: 35, w: 17, h: 20,
             title: 'Следы выстрелов',
-            action: 'discover',
-            repeatText: 'Следы выстрелов уже сфотографированы и зарегистрированы как вещественное доказательство.',
-            discoveries: {
-              fact: {
-                id: 'shots-fired-inside-office',
-                title: 'Выстрелы произведены в кабинете директора',
-                status: 'established',
-                text: 'В зоне рабочего стола зафиксированы следы попаданий. Это подтверждает, что стрельба произошла внутри кабинета директора.'
-              },
-              evidence: {
-                id: 'bullet-impact-traces',
-                kind: 'Следы',
-                title: 'Следы выстрелов в кабинете',
-                description: 'Схема и фотографии повреждений стены и мебели у рабочего места директора.',
-                location: 'Кабинет директора Люблинского рынка',
-                status: 'на хранении'
-              },
-              timeline: {
-                id: 'impact-traces-fixed',
-                time: '24 августа 1994, осмотр кабинета',
-                title: 'Зарегистрированы следы выстрелов',
-                status: 'established',
-                text: 'Следы попаданий внесены в материалы как вещественное доказательство.'
-              }
-            }
+            text: 'Эта зона оставлена как рабочая разметка для будущего осмотра следов. Пока нет отдельного inspectable evidence object, сведения не добавляются в материалы дела.'
           },
           {
             id: 'director-office-phone',
@@ -426,21 +417,15 @@ const rooms = {
         ]
       },
       {
-        src: './assets/locations/lyublino-market/director-office/04-incident-area.png',
-        label: 'Место осмотра',
-        alt: 'Нейтрально обозначенное место осмотра в кабинете директора',
+        src: './assets/locations/lyublino-market/director-office/04-neutral-wall.png',
+        label: 'Боковая стена',
+        alt: 'Боковая стена кабинета директора без второго тела',
         hotspots: [
-          {
-            id: 'director-office-covered-form',
-            x: 71, y: 70, w: 28, h: 24,
-            title: 'Накрытая фигура',
-            text: 'Фигура накрыта тканью. Это место требует отдельного процессуального осмотра; личность погибшего пока не установлена в материалах игрока.'
-          },
           {
             id: 'director-office-fallen-chair',
             x: 47, y: 70, w: 18, h: 18,
             title: 'Опрокинутый стул',
-            text: 'Стул лежит на боку. Пока это только наблюдение об обстановке, а не доказанная последовательность событий.'
+            text: 'Опрокинутый стул у боковой стены. Пока это только наблюдение об обстановке, а не доказанная последовательность событий.'
           },
           {
             id: 'director-office-side-table',
@@ -1302,10 +1287,17 @@ function toggleDebugHotspots(forceValue) {
 
 function clearProgressStorage() {
   Object.keys(localStorage).forEach(key => {
-    if (key.startsWith('things-of-the-past-') && key !== GAME_SETTINGS_KEY) {
+    if (isPlayerSaveKey(key)) {
       localStorage.removeItem(key);
     }
   });
+}
+
+function isPlayerSaveKey(key) {
+  if (key === GAME_SETTINGS_KEY) return false;
+  if (DEVELOPER_STORAGE_KEYS.has(key)) return false;
+  if (DEVELOPER_STORAGE_PREFIXES.some(prefix => key.startsWith(prefix))) return false;
+  return PLAYER_SAVE_KEYS.has(key) || PLAYER_SAVE_PREFIXES.some(prefix => key.startsWith(prefix));
 }
 
 function restoreDefaultHotspots() {

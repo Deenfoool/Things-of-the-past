@@ -8,62 +8,28 @@
       name: 'Работник рынка',
       role: 'Свидетель',
       portrait: 'Р',
+      developmentPlaceholder: true,
       intro: 'Мужчина держится у закрытой торговой точки и старается не смотреть в сторону администрации.',
-      greeting: 'Я работаю тут рядом. Самого момента не видел, но шум был такой, что все сразу притихли.',
+      greeting: 'Development placeholder: этот разговор проверяет интерфейс диалогов и пока не считается каноническим показанием по делу.',
       questions: [
         {
           id: 'heard-shots',
           text: 'Что вы слышали перед тем, как приехала милиция?',
           response: 'Сначала несколько резких хлопков со стороны администрации. Потом крики, люди побежали к выходу. Я не полез туда, только видел, как народ расступался.',
-          discoveries: {
-            fact: {
-              id: 'worker-heard-shots-admin-side',
-              title: 'Свидетель слышал хлопки со стороны администрации',
-              status: 'claim',
-              text: 'Работник рынка утверждает, что слышал несколько резких хлопков со стороны административной части, после чего началась паника.'
-            },
-            person: {
-              id: 'market-worker-unknown',
-              role: 'Свидетель',
-              name: null,
-              status: 'interviewed',
-              note: 'Работник боковой торговой зоны. Слышал хлопки со стороны администрации, но стрелявшего не видел.'
-            },
-            timeline: {
-              id: 'worker-heard-shots',
-              time: '24 августа 1994, до приезда милиции',
-              title: 'Свидетель слышит хлопки',
-              status: 'claim',
-              text: 'Показание работника: хлопки прозвучали со стороны административной части рынка.'
-            }
-          }
+          developmentNote: 'Заглушка для проверки ветки вопроса. В состояние расследования не записывается.'
         },
         {
           id: 'saw-suspect',
           text: 'Вы видели, кто выбегал от администрации?',
           response: 'Нет, лиц не видел. Только движение у прохода и как несколько человек резко уходили в сторону двора. Я не уверен, были ли они связаны со стрельбой.',
-          discoveries: {
-            fact: {
-              id: 'worker-saw-movement-yard',
-              title: 'Свидетель видел движение к двору',
-              status: 'claim',
-              text: 'Работник рынка сообщает о движении у прохода к двору после хлопков, но не может уверенно связать этих людей со стрельбой.'
-            }
-          }
+          developmentNote: 'Заглушка для проверки повторного вопроса. В состояние расследования не записывается.'
         },
         {
           id: 'about-office',
           requiresFact: 'victim-found-director-office',
           text: 'Кто обычно находился в кабинете администрации?',
           response: 'Туда без дела не ходили. Бумаги, вопросы аренды, директорские разговоры. Кто именно был внутри сегодня, я не видел.',
-          discoveries: {
-            fact: {
-              id: 'admin-office-controlled-access',
-              title: 'Кабинет администрации не был проходным местом',
-              status: 'claim',
-              text: 'По словам работника рынка, в административный кабинет обычно не заходили без дела; кто был внутри в момент стрельбы, он не видел.'
-            }
-          }
+          developmentNote: 'Заглушка для проверки условно открытого вопроса. В состояние расследования не записывается.'
         }
       ]
     }
@@ -188,11 +154,17 @@
     transcript.push({ kind: 'player', text: question.text });
     transcript.push({ kind: 'npc', text: question.response });
     markAsked(activeDialogue.id, question.id);
-    applyDiscoveries(question.discoveries || {});
+    applyDiscoveries(activeDialogue, question);
     render();
   }
 
-  function applyDiscoveries(discoveries) {
+  function applyDiscoveries(dialogue, question) {
+    if (dialogue.developmentPlaceholder) {
+      transcript.push({ kind: 'system', text: question.developmentNote || 'Development placeholder: сведения не добавлены в материалы дела.' });
+      return;
+    }
+
+    const discoveries = question.discoveries || {};
     if (!window.InvestigationState) return;
     window.InvestigationState.syncLegacyCase?.();
     if (discoveries.fact) window.InvestigationState.addFact(discoveries.fact);
