@@ -3,6 +3,10 @@
   const CASE_ACTIVE_KEY = 'things-of-the-past-case-active';
   const CASE_READ_KEY = 'things-of-the-past-case-brief-read';
   const NOTES_KEY = 'things-of-the-past-investigator-notes-v1';
+  const FORENSIC_FACT_ID = 'victim-firearm-injuries-preliminary';
+  const WOUNDED_ID_FACT = 'wounded-identified-arkhipov';
+  const WOUNDED_PERSON_ID = 'wounded-unknown';
+  const WOUNDED_TIMELINE_ID = 'wounded-identity-confirmed';
 
   const caseData = {
     number: 'Дело №001',
@@ -40,6 +44,7 @@
   const backdrop = overlay.querySelector('.desk-ui__backdrop');
 
   let activeCaseTab = 'summary';
+  let activeMode = null;
   let notesSaveTimer = null;
 
   function isCaseActive() {
@@ -56,8 +61,25 @@
     };
   }
 
+  function hasFact(id) {
+    return Boolean(caseState().facts?.some(item => item.id === id));
+  }
+
+  function woundedPerson() {
+    return caseState().people?.find(item => item.id === WOUNDED_PERSON_ID) || null;
+  }
+
+  function woundedIdentityEstablished() {
+    return woundedPerson()?.name === 'Алексей Архипов';
+  }
+
+  function canReceiveHospitalUpdate() {
+    return isCaseActive() && hasFact(FORENSIC_FACT_ID) && !woundedIdentityEstablished();
+  }
+
   function openUi(mode) {
     if (typeof debugHotspots !== 'undefined' && debugHotspots) return;
+    activeMode = mode;
     overlay.classList.add('is-open');
     overlay.setAttribute('aria-hidden', 'false');
 
@@ -71,6 +93,7 @@
   function closeUi() {
     overlay.classList.remove('is-open');
     overlay.setAttribute('aria-hidden', 'true');
+    activeMode = null;
   }
 
   function renderCaseFile() {
@@ -161,10 +184,12 @@
   function caseSummaryHtml() {
     const state = caseState();
     const victim = state.people.find(item => item.id === 'victim-unknown');
-    const wounded = state.people.find(item => item.id === 'wounded-unknown');
-    const victimText = victim?.status === 'observed'
-      ? '1 человек · обнаружен, личность пока не установлена'
-      : '1 человек · личность пока не установлена';
+    const wounded = state.people.find(item => item.id === WOUNDED_PERSON_ID);
+    const victimText = victim?.name
+      ? `1 человек · ${escapeHtml(victim.name)}${victim.occupation ? ` · ${escapeHtml(victim.occupation)}` : ''}`
+      : victim?.status === 'observed'
+        ? '1 человек · обнаружен, личность пока не установлена'
+        : '1 человек · личность пока не установлена';
     const woundedText = wounded?.name
       ? `1 человек · ${escapeHtml(wounded.name)}`
       : '1 человек · личность пока не установлена';
@@ -266,7 +291,7 @@
   }
 
   function statusLabel(status) {
-    return ({ claim: 'Неподтверждённое сообщение', established: 'Установлено', unknown: 'Неизвестно', observed: 'Обнаружен', interviewed: 'Опрошен' })[status] || '';
+    return ({ claim: 'Неподтверждённое сообщение', established: 'Установлено', corroborated: 'Подтверждено', unknown: 'Неизвестно', observed: 'Обнаружен', interviewed: 'Опрошен' })[status] || '';
   }
 
   function renderNotes() {
@@ -304,27 +329,75 @@
     });
   }
 
+  function receiveHospitalUpdate() {
+    if (!canReceiveHospitalUpdate() || !window.InvestigationState) return;
+
+    window.InvestigationState.addFact({
+      id: WOUNDED_ID_FACT,
+      title: 'Установлена личность раненого',
+      status: 'established',
+      text: 'Раненый, доставленный после происшествия на Люблинском рынке, установлен как Алексей Архипов.',
+      sourceType: 'service-update',
+      sourceRefs: ['S1', 'S2', 'S3', 'S4']
+    });
+
+    window.InvestigationState.upsertPerson({
+      id: WOUNDED_PERSON_ID,
+      role: 'Раненый',
+      name: 'Алексей Архипов',
+      status: 'established',
+      note: 'Алексей Архипов — раненый по делу. Личность подтверждена служебным сообщением из больницы; обстоятельства ранения ещё предстоит уточнить.'
+    });
+
+    window.InvestigationState.addTimeline({
+      id: WOUNDED_TIMELINE_ID,
+      time: '24 августа 1994, после первичного выезда',
+      title: 'Установлена личность раненого',
+      status: 'established',
+      text: 'Из больницы передано уточнение: раненый — Алексей Архипов.'
+    });
+  }
+
   function renderPhone() {
     eyebrow.textContent = 'Рабочий стол · телефон';
     title.textContent = 'Служебный телефон';
 
     const active = isCaseActive();
+    const incoming = canReceiveHospitalUpdate();
+    const woundedKnown = woundedIdentityEstablished();
+
+    let heading = 'Линия свободна';
+    let text = 'Активного дела пока нет. Телефон понадобится после получения задания у дежурного.';
+    if (active && incoming) {
+      heading = 'Есть новое служебное сообщение';
+      text = 'Из больницы передали уточнение по раненому, доставленному после происшествия на Люблинском рынке.';
+    } else if (active && woundedKnown) {
+      heading = 'Новых сообщений нет';
+      text = 'Последнее служебное уточнение принято: личность раненого установлена.';
+    } else if (active) {
+      heading = 'Срочных звонков нет';
+      text = 'Дело принято. Новые звонки свидетелей, экспертов и сотрудников будут появляться здесь по мере расследования.';
+    }
+
     body.innerHTML = `
       <div class="phone-panel">
         <div class="phone-panel__receiver" aria-hidden="true">☎</div>
         <div>
           <span class="phone-panel__line">Линия 2 · внутренняя</span>
-          <h3>${active ? 'Срочных звонков нет' : 'Линия свободна'}</h3>
-          <p>${active ? 'Дело принято. Новые звонки свидетелей, экспертов и сотрудников будут появляться здесь по мере расследования.' : 'Активного дела пока нет. Телефон понадобится после получения задания у дежурного.'}</p>
+          <h3>${heading}</h3>
+          <p>${text}</p>
+          ${incoming ? '<button class="desk-ui__primary" type="button" data-receive-hospital-update>Принять сообщение</button>' : ''}
         </div>
       </div>
       <div class="phone-log">
         <strong>Журнал последних событий</strong>
         ${active
-          ? '<div><span>Дежурная часть</span><small>Передано первичное сообщение по Люблинскому рынку</small></div>'
+          ? `<div><span>Дежурная часть</span><small>Передано первичное сообщение по Люблинскому рынку</small></div>${woundedKnown ? '<div><span>Больница</span><small>Раненый установлен как Алексей Архипов</small></div>' : ''}`
           : '<div class="is-empty">Записей пока нет</div>'}
       </div>
     `;
+
+    body.querySelector('[data-receive-hospital-update]')?.addEventListener('click', receiveHospitalUpdate);
   }
 
   function escapeHtml(value) {
@@ -378,6 +451,8 @@
   }, true);
 
   window.addEventListener('investigation:change', () => {
-    if (overlay.classList.contains('is-open') && isCaseActive()) renderActiveCaseTab();
+    if (!overlay.classList.contains('is-open') || !isCaseActive()) return;
+    if (activeMode === 'case') renderActiveCaseTab();
+    if (activeMode === 'phone') renderPhone();
   });
 })();
