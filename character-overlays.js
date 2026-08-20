@@ -24,6 +24,17 @@
         { id: 'turned-around', label: 'Обернулся', sprite: './assets/characters/lyublino-market/criminalist-market/turned-around.png' },
         { id: 'thinks', label: 'Обдумывает', sprite: './assets/characters/lyublino-market/criminalist-market/thinks.png' }
       ]
+    },
+    'arkhipov-ward': {
+      title: 'Алексей Архипов',
+      defaultName: 'Алексей Архипов',
+      dialogueId: 'arkhipov-hospital',
+      variants: [
+        { id: 'resting', label: 'Отдыхает', sprite: './assets/characters/hospital/arkhipov-ward/resting.png' },
+        { id: 'speaking', label: 'Говорит', sprite: './assets/characters/hospital/arkhipov-ward/speaking.png' },
+        { id: 'recalling', label: 'Вспоминает', sprite: './assets/characters/hospital/arkhipov-ward/recalling.png' },
+        { id: 'tired', label: 'Устал', sprite: './assets/characters/hospital/arkhipov-ward/tired.png' }
+      ]
     }
   };
 
@@ -91,6 +102,23 @@
         'written': { x: 25.6, y: 44.3, w: 21, h: 48, rotation: 0, flipX: false },
         'turned-around': { x: 25.6, y: 43.8, w: 19, h: 47, rotation: 0, flipX: false },
         'thinks': { x: 25.6, y: 43.8, w: 19, h: 47, rotation: 0, flipX: false }
+      },
+      visible: true,
+      requiresCase: 'lyublino-1994'
+    },
+    {
+      id: 'hospital-arkhipov',
+      type: 'arkhipov-ward',
+      roomId: 'hospital-ward',
+      sceneIndex: 0,
+      name: 'Алексей Архипов',
+      dialogueId: 'arkhipov-hospital',
+      variantId: 'resting',
+      variantLayouts: {
+        resting: { x: 55, y: 64, w: 80, h: 60, rotation: 0, flipX: false },
+        speaking: { x: 55, y: 64, w: 80, h: 60, rotation: 0, flipX: false },
+        recalling: { x: 55, y: 64, w: 80, h: 60, rotation: 0, flipX: false },
+        tired: { x: 55, y: 64, w: 80, h: 60, rotation: 0, flipX: false }
       },
       visible: true,
       requiresCase: 'lyublino-1994'
