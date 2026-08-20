@@ -177,8 +177,13 @@
   function setLocationRuntime(id, runtime = {}) {
     const location = state.locations.find(item => item.id === id);
     if (!location) return null;
+
+    const patch = clone(runtime);
+    const changed = Object.entries(patch).some(([key, value]) => !Object.is(location[key], value));
+    if (!changed) return clone(location);
+
     const previous = clone(location);
-    Object.assign(location, clone(runtime));
+    Object.assign(location, patch);
     save('location-runtime', 'location-updated', { record: clone(location), previous });
     return clone(location);
   }
