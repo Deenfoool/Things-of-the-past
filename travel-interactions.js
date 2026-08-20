@@ -119,21 +119,45 @@
 
   function registerLocation(config) {
     if (!config?.id) throw new Error('Field location requires id');
-    const previous = registry.get(config.id) || {};
-    registry.set(config.id, { ...previous, ...config });
 
-    if (config.roomId && Array.isArray(config.scenes)) {
+    const previous = registry.get(config.id) || {};
+    const incomingReady = Boolean(config.roomId && Array.isArray(config.scenes));
+
+    if (incomingReady) {
       rooms[config.roomId] = {
         label: config.roomLabel || config.title || config.id,
         scenes: config.scenes
       };
-      registry.set(config.id, { ...registry.get(config.id), artReady: true });
     }
 
-    window.InvestigationState?.setLocationRuntime(config.id, {
-      roomId: config.roomId || previous.roomId || null,
-      artReady: Boolean(config.roomId && Array.isArray(config.scenes))
+    // Runtime registration is monotonic: a lightweight metadata refresh must never
+    // downgrade a location that already has a registered room and ready art.
+    const effectiveRoomId = incomingReady
+      ? config.roomId
+      : (previous.roomId || config.roomId || null);
+    const effectiveArtReady = Boolean(incomingReady || previous.artReady);
+
+    registry.set(config.id, {
+      ...previous,
+      ...config,
+      roomId: effectiveRoomId,
+      artReady: effectiveArtReady
     });
+
+    // Avoid emitting investigation:change when the runtime values are already
+    // identical. This prevents event feedback loops between case modules and the
+    // shared travel registry.
+    const stateLocation = window.InvestigationState?.get?.().locations?.find(item => item.id === config.id);
+    if (
+      stateLocation &&
+      (stateLocation.roomId !== effectiveRoomId || Boolean(stateLocation.artReady) !== effectiveArtReady)
+    ) {
+      window.InvestigationState?.setLocationRuntime(config.id, {
+        roomId: effectiveRoomId,
+        artReady: effectiveArtReady
+      });
+    }
+
     if (overlay.classList.contains('is-open')) render();
   }
 
