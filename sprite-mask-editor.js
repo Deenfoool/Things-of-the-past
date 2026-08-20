@@ -17,6 +17,8 @@
   let brushPercent = DEFAULT_BRUSH_PERCENT;
   let activeStroke = null;
   let statusTimer = null;
+  let previewImage = null;
+  let previewKey = '';
 
   injectControls();
 
@@ -30,6 +32,9 @@
   const copyButton = document.getElementById('spriteMaskCopy');
   const spriteName = document.getElementById('spriteMaskSpriteName');
   const status = document.getElementById('spriteMaskStatus');
+  const preview = document.getElementById('spriteMaskPreview');
+  const previewCanvas = document.getElementById('spriteMaskPreviewCanvas');
+  const previewEmpty = document.getElementById('spriteMaskPreviewEmpty');
 
   function injectControls() {
     if (document.getElementById('spriteMaskEditor')) return;
@@ -44,6 +49,11 @@
           <small id="spriteMaskSpriteName">Выбери NPC и кадр</small>
         </div>
         <button id="spriteMaskEditToggle" type="button" aria-pressed="false">Редактировать</button>
+      </div>
+
+      <div class="sprite-mask-editor__preview" id="spriteMaskPreview">
+        <canvas id="spriteMaskPreviewCanvas" aria-label="Редактируемый PNG-кадр"></canvas>
+        <span id="spriteMaskPreviewEmpty">Выбери NPC и нужный кадр</span>
       </div>
 
       <div class="sprite-mask-editor__tools" role="group" aria-label="Инструмент маски">
@@ -62,7 +72,7 @@
         <button id="spriteMaskCopy" type="button">Скопировать маску</button>
       </div>
 
-      <p class="sprite-mask-editor__hint">Ластик скрывает пиксели только у выбранного PNG-кадра. Обратный ластик восстанавливает пиксели из исходного изображения. Оригинальный файл не меняется.</p>
+      <p class="sprite-mask-editor__hint">Нажми «Редактировать» и работай кистью в большом превью выше. Ластик скрывает пиксели, обратный ластик возвращает их из исходного PNG. Каждый кадр хранит свою маску отдельно.</p>
       <span class="sprite-mask-editor__status" id="spriteMaskStatus" role="status" aria-live="polite">Маска сохраняется в браузере</span>
     `;
 
@@ -92,8 +102,7 @@
     let value = String(src).split('?')[0].split('#')[0].replaceAll('\\', '/');
     const assetsIndex = value.indexOf('assets/');
     if (assetsIndex >= 0) value = `./${value.slice(assetsIndex)}`;
-    value = value.replace(/\.webp$/i, '.png');
-    return value;
+    return value.replace(/\.webp$/i, '.png');
   }
 
   function effectiveStrokes(key) {
@@ -115,47 +124,48 @@
       .find(element => element.dataset.characterId === id) || null;
   }
 
-  function selectedCanvas() {
-    return selectedCharacterElement()?.querySelector('.sprite-mask-canvas') || null;
+  function selectedSourceImage() {
+    return selectedCharacterElement()?.querySelector('.scene-character__sprite img') || null;
   }
 
   function selectedSpriteKey() {
-    return selectedCanvas()?.dataset.spriteMaskKey || '';
+    const img = selectedSourceImage();
+    return img ? canonicalSpriteKey(img.getAttribute('src') || img.src) : '';
   }
 
   function decorateAllSprites() {
     characterLayer.querySelectorAll('.scene-character__sprite img').forEach(decorateSprite);
-    syncUi();
+    syncSelection();
   }
 
   function decorateSprite(img) {
     if (img.dataset.spriteMaskDecorated === '1') return;
     img.dataset.spriteMaskDecorated = '1';
-    img.classList.add('sprite-mask-source');
 
     const canvas = document.createElement('canvas');
     canvas.className = 'sprite-mask-canvas';
     canvas.dataset.spriteMaskKey = canonicalSpriteKey(img.getAttribute('src') || img.src);
     img.insertAdjacentElement('afterend', canvas);
 
-    const render = () => renderSprite(img, canvas);
-    if (img.complete && img.naturalWidth) {
-      render();
-    } else {
-      img.addEventListener('load', render, { once: true });
-    }
+    const render = () => {
+      renderSprite(img, canvas);
+      img.classList.add('sprite-mask-source');
+    };
 
-    canvas.addEventListener('pointerdown', beginMaskStroke);
-    canvas.addEventListener('pointermove', continueMaskStroke);
-    canvas.addEventListener('pointerup', endMaskStroke);
-    canvas.addEventListener('pointercancel', endMaskStroke);
+    if (img.complete && img.naturalWidth) render();
+    else img.addEventListener('load', render, { once: true });
   }
 
   function renderSprite(img, canvas) {
     if (!img.naturalWidth || !img.naturalHeight) return;
+    drawMaskedImage(img, canvas, effectiveStrokes(canvas.dataset.spriteMaskKey));
+  }
 
+  function drawMaskedImage(img, canvas, strokes) {
     const width = img.naturalWidth;
     const height = img.naturalHeight;
+    if (!width || !height) return;
+
     if (canvas.width !== width) canvas.width = width;
     if (canvas.height !== height) canvas.height = height;
 
@@ -166,9 +176,7 @@
     context.globalCompositeOperation = 'source-over';
     context.drawImage(img, 0, 0, width, height);
 
-    const key = canvas.dataset.spriteMaskKey;
-    const strokes = effectiveStrokes(key);
-    if (!strokes.length) return;
+    if (!strokes?.length) return;
 
     const mask = document.createElement('canvas');
     mask.width = width;
@@ -178,7 +186,6 @@
 
     maskContext.fillStyle = '#fff';
     maskContext.fillRect(0, 0, width, height);
-
     strokes.forEach(stroke => paintMaskStroke(maskContext, stroke, width, height));
 
     context.globalCompositeOperation = 'destination-in';
@@ -220,6 +227,50 @@
     context.restore();
   }
 
+  function syncSelection() {
+    const img = selectedSourceImage();
+    const key = img ? canonicalSpriteKey(img.getAttribute('src') || img.src) : '';
+
+    if (!img || !key) {
+      previewImage = null;
+      previewKey = '';
+      clearPreview();
+      syncUi();
+      return;
+    }
+
+    previewImage = img;
+    previewKey = key;
+
+    const render = () => {
+      renderPreview();
+      syncUi();
+    };
+
+    if (img.complete && img.naturalWidth) render();
+    else img.addEventListener('load', render, { once: true });
+  }
+
+  function clearPreview() {
+    if (previewCanvas) {
+      const context = previewCanvas.getContext('2d');
+      context?.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+      previewCanvas.width = 1;
+      previewCanvas.height = 1;
+    }
+    preview?.classList.add('is-empty');
+  }
+
+  function renderPreview() {
+    if (!previewCanvas || !previewImage || !previewImage.naturalWidth || !previewKey) {
+      clearPreview();
+      return;
+    }
+
+    preview.classList.remove('is-empty');
+    drawMaskedImage(previewImage, previewCanvas, effectiveStrokes(previewKey));
+  }
+
   function pointerPoint(canvas, event) {
     const rect = canvas.getBoundingClientRect();
     if (!rect.width || !rect.height) return null;
@@ -230,36 +281,34 @@
   }
 
   function beginMaskStroke(event) {
-    const canvas = event.currentTarget;
-    if (!canEditCanvas(canvas) || event.button !== 0) return;
+    if (!editEnabled || !previewKey || !previewImage || event.button !== 0) return;
 
     event.preventDefault();
     event.stopPropagation();
 
-    const point = pointerPoint(canvas, event);
+    const point = pointerPoint(previewCanvas, event);
     if (!point) return;
 
-    const key = canvas.dataset.spriteMaskKey;
     const stroke = {
       mode: tool,
       radius: round4(brushPercent / 100),
       points: [point.map(round4)]
     };
 
-    editableStrokes(key).push(stroke);
-    activeStroke = { canvas, key, stroke, pointerId: event.pointerId };
-    canvas.setPointerCapture?.(event.pointerId);
-    renderMatchingSprites(key);
+    editableStrokes(previewKey).push(stroke);
+    activeStroke = { key: previewKey, stroke, pointerId: event.pointerId };
+    previewCanvas.setPointerCapture?.(event.pointerId);
+    renderCurrentMask();
     setStatus(tool === 'restore' ? 'Восстанавливаю пиксели…' : 'Стираю пиксели…');
   }
 
   function continueMaskStroke(event) {
-    if (!activeStroke || activeStroke.canvas !== event.currentTarget || activeStroke.pointerId !== event.pointerId) return;
+    if (!activeStroke || activeStroke.pointerId !== event.pointerId || activeStroke.key !== previewKey) return;
 
     event.preventDefault();
     event.stopPropagation();
 
-    const point = pointerPoint(activeStroke.canvas, event);
+    const point = pointerPoint(previewCanvas, event);
     if (!point) return;
 
     const points = activeStroke.stroke.points;
@@ -269,7 +318,7 @@
     if (Math.hypot(dx, dy) < 0.0025) return;
 
     points.push(point.map(round4));
-    renderMatchingSprites(activeStroke.key);
+    renderCurrentMask();
   }
 
   function endMaskStroke(event) {
@@ -278,17 +327,16 @@
     event.preventDefault();
     event.stopPropagation();
 
-    const key = activeStroke.key;
     activeStroke = null;
     saveMaskEdits();
-    renderMatchingSprites(key);
+    renderCurrentMask();
     setStatus('Маска кадра сохранена', true);
     syncUi();
   }
 
-  function canEditCanvas(canvas) {
-    if (!editEnabled || !game.classList.contains('is-character-debug')) return false;
-    return canvas === selectedCanvas();
+  function renderCurrentMask() {
+    renderPreview();
+    renderMatchingSprites(previewKey);
   }
 
   function renderMatchingSprites(key) {
@@ -304,11 +352,13 @@
       const img = canvas.previousElementSibling;
       if (img instanceof HTMLImageElement) renderSprite(img, canvas);
     });
+    renderPreview();
   }
 
   function setEditing(value) {
-    editEnabled = Boolean(value) && game.classList.contains('is-character-debug');
+    editEnabled = Boolean(value) && Boolean(previewImage) && game.classList.contains('is-character-debug');
     game.classList.toggle('is-sprite-mask-edit', editEnabled);
+    preview?.classList.toggle('is-editing', editEnabled);
     editToggle?.classList.toggle('is-active', editEnabled);
     editToggle?.setAttribute('aria-pressed', String(editEnabled));
     if (editToggle) editToggle.textContent = editEnabled ? 'Готово' : 'Редактировать';
@@ -319,38 +369,36 @@
     tool = nextTool === 'restore' ? 'restore' : 'erase';
     eraseButton?.classList.toggle('is-active', tool === 'erase');
     restoreButton?.classList.toggle('is-active', tool === 'restore');
+    preview?.classList.toggle('is-restore', tool === 'restore');
     setStatus(tool === 'restore' ? 'Обратный ластик: возвращает исходные пиксели' : 'Ластик: скрывает пиксели');
   }
 
   function undoStroke() {
-    const key = selectedSpriteKey();
-    if (!key) return;
-    const strokes = editableStrokes(key);
+    if (!previewKey) return;
+    const strokes = editableStrokes(previewKey);
     if (!strokes.length) {
       setStatus('Отменять нечего');
       return;
     }
     strokes.pop();
     saveMaskEdits();
-    renderMatchingSprites(key);
+    renderCurrentMask();
     setStatus('Последний мазок отменён', true);
     syncUi();
   }
 
   function resetSprite() {
-    const key = selectedSpriteKey();
-    if (!key) return;
-    maskEdits[key] = [];
+    if (!previewKey) return;
+    maskEdits[previewKey] = [];
     saveMaskEdits();
-    renderMatchingSprites(key);
+    renderCurrentMask();
     setStatus('Кадр возвращён к оригиналу', true);
     syncUi();
   }
 
   async function copyMask() {
-    const key = selectedSpriteKey();
-    if (!key) return;
-    const payload = JSON.stringify({ sprite: key, strokes: effectiveStrokes(key) }, null, 2);
+    if (!previewKey) return;
+    const payload = JSON.stringify({ sprite: previewKey, strokes: effectiveStrokes(previewKey) }, null, 2);
     let copied = false;
 
     try {
@@ -380,12 +428,16 @@
   }
 
   function syncUi() {
-    const canvas = selectedCanvas();
-    const key = canvas?.dataset.spriteMaskKey || '';
-    const available = Boolean(canvas);
-    const strokes = key ? effectiveStrokes(key) : [];
+    const available = Boolean(previewImage && previewKey);
+    const strokes = available ? effectiveStrokes(previewKey) : [];
 
-    if (spriteName) spriteName.textContent = key ? `${key.split('/').pop()} · мазков: ${strokes.length}` : 'Выбери NPC и кадр';
+    if (spriteName) {
+      spriteName.textContent = available
+        ? `${previewKey.split('/').pop()} · мазков: ${strokes.length}`
+        : 'Выбери NPC и кадр';
+    }
+    if (previewEmpty) previewEmpty.hidden = available;
+    if (previewCanvas) previewCanvas.hidden = !available;
 
     [editToggle, eraseButton, restoreButton, brushInput, undoButton, resetButton, copyButton].forEach(control => {
       if (control) control.disabled = !available;
@@ -423,9 +475,15 @@
   undoButton?.addEventListener('click', undoStroke);
   resetButton?.addEventListener('click', resetSprite);
   copyButton?.addEventListener('click', copyMask);
+
+  previewCanvas?.addEventListener('pointerdown', beginMaskStroke);
+  previewCanvas?.addEventListener('pointermove', continueMaskStroke);
+  previewCanvas?.addEventListener('pointerup', endMaskStroke);
+  previewCanvas?.addEventListener('pointercancel', endMaskStroke);
+
   characterSelect?.addEventListener('change', () => requestAnimationFrame(() => {
     setEditing(false);
-    syncUi();
+    syncSelection();
   }));
   characterVariantSelect?.addEventListener('change', () => requestAnimationFrame(() => {
     setEditing(false);
@@ -455,9 +513,10 @@
       maskEdits[key] = [];
       saveMaskEdits();
       renderMatchingSprites(key);
+      if (previewKey === key) renderPreview();
     }
   };
 
   decorateAllSprites();
-  syncUi();
+  syncSelection();
 })();
