@@ -17,19 +17,6 @@
           text: 'Что вы слышали перед тем, как приехала милиция?',
           response: 'Сначала несколько резких хлопков со стороны администрации. Потом крики, люди побежали к выходу. Я не полез туда, только видел, как народ расступался.',
           developmentNote: 'Заглушка для проверки ветки вопроса. В состояние расследования не записывается.'
-        },
-        {
-          id: 'saw-suspect',
-          text: 'Вы видели, кто выбегал от администрации?',
-          response: 'Нет, лиц не видел. Только движение у прохода и как несколько человек резко уходили в сторону двора. Я не уверен, были ли они связаны со стрельбой.',
-          developmentNote: 'Заглушка для проверки повторного вопроса. В состояние расследования не записывается.'
-        },
-        {
-          id: 'about-office',
-          requiresFact: 'victim-found-director-office',
-          text: 'Кто обычно находился в кабинете администрации?',
-          response: 'Туда без дела не ходили. Бумаги, вопросы аренды, директорские разговоры. Кто именно был внутри сегодня, я не видел.',
-          developmentNote: 'Заглушка для проверки условно открытого вопроса. В состояние расследования не записывается.'
         }
       ]
     }
@@ -75,6 +62,10 @@
   let activeDialogue = null;
   let transcript = [];
 
+  function clone(value) {
+    return JSON.parse(JSON.stringify(value));
+  }
+
   function readAsked() {
     try {
       const parsed = JSON.parse(localStorage.getItem(ASKED_KEY) || '{}');
@@ -107,28 +98,45 @@
     saveAsked(asked);
   }
 
+  function register(dialogueOrList) {
+    const list = Array.isArray(dialogueOrList) ? dialogueOrList : [dialogueOrList];
+    list.forEach(dialogue => {
+      if (!dialogue?.id) return;
+      dialogues[dialogue.id] = clone(dialogue);
+    });
+    return list.filter(item => item?.id).map(item => item.id);
+  }
+
+  function has(dialogueId) {
+    return Boolean(dialogues[dialogueId]);
+  }
+
   function open(dialogueId) {
-    if (typeof debugHotspots !== 'undefined' && debugHotspots) return;
+    if (typeof debugHotspots !== 'undefined' && debugHotspots) return false;
     const dialogue = dialogues[dialogueId];
-    if (!dialogue) return;
+    if (!dialogue) return false;
 
     activeDialogue = dialogue;
     transcript = [{ kind: 'npc', text: dialogue.greeting }];
     portrait.textContent = dialogue.portrait || '?';
-    role.textContent = dialogue.role;
-    name.textContent = dialogue.name;
-    intro.textContent = dialogue.intro;
+    role.textContent = dialogue.role || '';
+    name.textContent = dialogue.name || 'Собеседник';
+    intro.textContent = dialogue.intro || '';
     panel.classList.add('is-open');
     panel.setAttribute('aria-hidden', 'false');
     render();
     closeButton.focus();
+    window.dispatchEvent(new CustomEvent('dialogue:open', { detail: { id: dialogue.id } }));
+    return true;
   }
 
   function close() {
+    const id = activeDialogue?.id || null;
     panel.classList.remove('is-open');
     panel.setAttribute('aria-hidden', 'true');
     activeDialogue = null;
     transcript = [];
+    if (id) window.dispatchEvent(new CustomEvent('dialogue:close', { detail: { id } }));
   }
 
   function render() {
@@ -137,7 +145,7 @@
     log.innerHTML = transcript.map(line => `<div class="dialogue-ui__line is-${line.kind}">${escapeHtml(line.text)}</div>`).join('');
     log.scrollTop = log.scrollHeight;
 
-    const available = activeDialogue.questions.filter(question => hasFact(question.requiresFact));
+    const available = (activeDialogue.questions || []).filter(question => hasFact(question.requiresFact));
     choices.innerHTML = available.length
       ? available.map(question => `<button class="dialogue-ui__choice ${asked.has(question.id) ? 'is-asked' : ''}" type="button" data-dialogue-question="${question.id}">${escapeHtml(question.text)}</button>`).join('')
       : '<div class="dialogue-ui__empty">Сейчас больше не о чем спросить.</div>';
@@ -148,7 +156,7 @@
   }
 
   function askQuestion(questionId) {
-    const question = activeDialogue?.questions.find(item => item.id === questionId);
+    const question = activeDialogue?.questions?.find(item => item.id === questionId);
     if (!question) return;
 
     transcript.push({ kind: 'player', text: question.text });
@@ -156,6 +164,9 @@
     markAsked(activeDialogue.id, question.id);
     applyDiscoveries(activeDialogue, question);
     render();
+    window.dispatchEvent(new CustomEvent('dialogue:question', {
+      detail: { dialogueId: activeDialogue.id, questionId: question.id }
+    }));
   }
 
   function applyDiscoveries(dialogue, question) {
@@ -165,6 +176,15 @@
     }
 
     const discoveries = question.discoveries || {};
+    const hasDiscoveries = Boolean(
+      discoveries.fact || discoveries.person || discoveries.evidence || discoveries.location || discoveries.timeline
+    );
+
+    if (!hasDiscoveries) {
+      if (question.systemNote) transcript.push({ kind: 'system', text: question.systemNote });
+      return;
+    }
+
     if (!window.InvestigationState) return;
     window.InvestigationState.syncLegacyCase?.();
     if (discoveries.fact) window.InvestigationState.addFact(discoveries.fact);
@@ -172,7 +192,7 @@
     if (discoveries.evidence) window.InvestigationState.addEvidence(discoveries.evidence);
     if (discoveries.location) window.InvestigationState.unlockLocation(discoveries.location);
     if (discoveries.timeline) window.InvestigationState.addTimeline(discoveries.timeline);
-    transcript.push({ kind: 'system', text: 'Сведения добавлены в материалы дела.' });
+    transcript.push({ kind: 'system', text: question.systemNote || 'Сведения добавлены в материалы дела.' });
   }
 
   function escapeHtml(value) {
@@ -194,5 +214,11 @@
     }
   }, true);
 
-  window.DialogueSystem = { open };
+  window.DialogueSystem = {
+    open,
+    close,
+    register,
+    has,
+    activeId: () => activeDialogue?.id || null
+  };
 })();
