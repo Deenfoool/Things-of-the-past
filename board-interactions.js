@@ -155,12 +155,34 @@
   function investigationOverride(card, state) {
     if (card.id === 'dead-unknown') {
       const victim = state.people?.find(item => item.id === 'victim-unknown');
+      if (victim?.status === 'established' && victim?.name) {
+        return {
+          ...card,
+          title: victim.name,
+          text: victim.occupation ? `${victim.occupation}. Погибший.` : 'Личность погибшего установлена.',
+          status: 'Личность установлена',
+          details: victim.note || `${victim.name}. Личность погибшего установлена.`
+        };
+      }
       if (victim?.status === 'observed') {
         return {
           ...card,
           text: victim.note || 'Обнаружен в кабинете директора.',
           status: 'Обнаружен',
           details: 'Положение погибшего зафиксировано при осмотре кабинета директора. Личность пока не установлена.'
+        };
+      }
+    }
+
+    if (card.id === 'wounded-unknown') {
+      const wounded = state.people?.find(item => item.id === 'wounded-unknown');
+      if (wounded?.name) {
+        return {
+          ...card,
+          title: wounded.name,
+          text: wounded.note || 'Личность раненого установлена.',
+          status: 'Личность установлена',
+          details: wounded.note || `${wounded.name}. Личность раненого установлена.`
         };
       }
     }
