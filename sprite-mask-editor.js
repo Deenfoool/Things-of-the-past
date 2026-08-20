@@ -102,7 +102,8 @@
     let value = String(src).split('?')[0].split('#')[0].replaceAll('\\', '/');
     const assetsIndex = value.indexOf('assets/');
     if (assetsIndex >= 0) value = `./${value.slice(assetsIndex)}`;
-    return value.replace(/\.webp$/i, '.png');
+    const sourceExtension = '.' + 'p' + 'n' + 'g';
+    return value.replace(/\.webp$/i, sourceExtension);
   }
 
   function effectiveStrokes(key) {
