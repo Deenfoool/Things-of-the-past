@@ -13,39 +13,19 @@
         { id: 'pointing', label: 'Указывает', sprite: './assets/characters/lyublino-market/market-worker/pointing.png' },
         { id: 'look-away', label: 'Смотрит в сторону', sprite: './assets/characters/lyublino-market/market-worker/look-away.png' }
       ]
+    },
+    'criminalist-market': {
+      title: 'Криминалист',
+      defaultName: 'Криминалист',
+      dialogueId: '',
+      variants: [
+        { id: 'leaned-over', label: 'Осматривает погибшего', sprite: './assets/characters/lyublino-market/criminalist-market/leaned-over.png' },
+        { id: 'written', label: 'Делает записи', sprite: './assets/characters/lyublino-market/criminalist-market/written.png' },
+        { id: 'turned-around', label: 'Обернулся', sprite: './assets/characters/lyublino-market/criminalist-market/turned-around.png' },
+        { id: 'thinks', label: 'Обдумывает', sprite: './assets/characters/lyublino-market/criminalist-market/thinks.png' }
+      ]
     }
   };
-
-  const baseCharacters = [
-    {
-      id: 'market-side-worker',
-      type: 'market-worker',
-      roomId: 'market-main',
-      sceneIndex: 1,
-      name: 'Работник рынка',
-      dialogueId: 'market-worker-first',
-      variantId: 'idle-seated',
-      variantLayouts: createVariantLayouts('market-worker', {
-        x: 20.6,
-        y: 55.6,
-        w: 18.8,
-        h: 50,
-        rotation: 0,
-        flipX: false
-      }),
-      visible: true,
-      requiresCase: 'lyublino-1994'
-    }
-  ];
-
-  let characters = mergeSavedCharacters();
-  let selectedCharacterId = null;
-  let dragState = null;
-
-  const layer = document.createElement('div');
-  layer.className = 'character-layer';
-  layer.id = 'characterLayer';
-  sceneEl.appendChild(layer);
 
   function clone(value) {
     return JSON.parse(JSON.stringify(value));
@@ -78,8 +58,52 @@
     return Object.fromEntries(definition.variants.map(variant => [variant.id, clone(geometry)]));
   }
 
+  const baseCharacters = [
+    {
+      id: 'market-side-worker',
+      type: 'market-worker',
+      roomId: 'market-main',
+      sceneIndex: 1,
+      name: 'Работник рынка',
+      dialogueId: 'market-worker-first',
+      variantId: 'idle-seated',
+      variantLayouts: createVariantLayouts('market-worker', {
+        x: 20.6,
+        y: 55.6,
+        w: 18.8,
+        h: 50,
+        rotation: 0,
+        flipX: false
+      }),
+      visible: true,
+      requiresCase: 'lyublino-1994'
+    },
+    {
+      id: 'director-office-criminalist',
+      type: 'criminalist-market',
+      roomId: 'director-office',
+      sceneIndex: 1,
+      name: 'Криминалист',
+      dialogueId: '',
+      variantId: 'leaned-over',
+      variantLayouts: {
+        'leaned-over': { x: 25.6, y: 44.5, w: 24, h: 49, rotation: 0, flipX: false },
+        'written': { x: 25.6, y: 44.3, w: 21, h: 48, rotation: 0, flipX: false },
+        'turned-around': { x: 25.6, y: 43.8, w: 19, h: 47, rotation: 0, flipX: false },
+        'thinks': { x: 25.6, y: 43.8, w: 19, h: 47, rotation: 0, flipX: false }
+      },
+      visible: true,
+      requiresCase: 'lyublino-1994'
+    }
+  ];
+
+  let selectedCharacterId = null;
+  let dragState = null;
+
   function normalizeCharacter(record, base = null) {
-    const type = characterTypes[record?.type] ? record.type : (characterTypes[base?.type] ? base.type : 'market-worker');
+    const type = characterTypes[record?.type]
+      ? record.type
+      : (characterTypes[base?.type] ? base.type : 'market-worker');
     const definition = characterTypes[type];
     const validVariantIds = new Set(definition.variants.map(variant => variant.id));
     const fallbackVariantId = definition.variants[0].id;
@@ -122,6 +146,32 @@
     }
   }
 
+  function defaultCharacter(type = 'market-worker') {
+    const definition = characterTypes[type] || characterTypes['market-worker'];
+    const variant = definition.variants[0];
+    return normalizeCharacter({
+      id: `npc-${Date.now().toString(36)}`,
+      type,
+      roomId: currentRoomId,
+      sceneIndex: currentIndex,
+      name: definition.defaultName,
+      dialogueId: definition.dialogueId,
+      variantId: variant.id,
+      variantLayouts: createVariantLayouts(type, defaultGeometry()),
+      visible: true
+    });
+  }
+
+  function activeGeometry(character, variantId = character?.variantId) {
+    if (!character) return defaultGeometry();
+    const definition = characterTypes[character.type] || characterTypes['market-worker'];
+    const fallbackId = definition.variants[0].id;
+    const id = definition.variants.some(variant => variant.id === variantId) ? variantId : fallbackId;
+    if (!character.variantLayouts) character.variantLayouts = createVariantLayouts(character.type, defaultGeometry());
+    if (!character.variantLayouts[id]) character.variantLayouts[id] = clone(defaultGeometry());
+    return character.variantLayouts[id];
+  }
+
   function mergeSavedCharacters() {
     const saved = readSavedCharacters();
     const normalizedBase = baseCharacters.map(character => normalizeCharacter(character));
@@ -141,10 +191,11 @@
         }
       };
 
-      // Old v1 records kept one shared x/y/w/h transform. Seed every frame
-      // from that transform once, then all frames become independent.
       if (!savedCharacter.variantLayouts && GEOMETRY_KEYS.some(key => Object.prototype.hasOwnProperty.call(savedCharacter, key))) {
-        merged.variantLayouts = createVariantLayouts(merged.type, geometryFrom(savedCharacter, activeGeometry(fallback)));
+        merged.variantLayouts = createVariantLayouts(
+          merged.type,
+          geometryFrom(savedCharacter, activeGeometry(fallback))
+        );
       }
 
       byId.set(savedCharacter.id, normalizeCharacter(merged, fallback));
@@ -152,10 +203,12 @@
     return Array.from(byId.values());
   }
 
-  function saveCharacters() {
-    localStorage.setItem(CHARACTER_LAYOUT_KEY, JSON.stringify(characters.map(serializableCharacter)));
-    window.dispatchEvent(new CustomEvent('characters:change', { detail: { characters: list() } }));
-  }
+  let characters = mergeSavedCharacters();
+
+  const layer = document.createElement('div');
+  layer.className = 'character-layer';
+  layer.id = 'characterLayer';
+  sceneEl.appendChild(layer);
 
   function serializableCharacter(character) {
     const { requiresCase, ...record } = character;
@@ -164,34 +217,13 @@
     return result;
   }
 
-  function defaultCharacter(type = 'market-worker') {
-    const definition = characterTypes[type] || characterTypes['market-worker'];
-    const variant = definition.variants[0];
-    return normalizeCharacter({
-      id: `npc-${Date.now().toString(36)}`,
-      type,
-      roomId: currentRoomId,
-      sceneIndex: currentIndex,
-      name: definition.defaultName,
-      dialogueId: definition.dialogueId,
-      variantId: variant.id,
-      variantLayouts: createVariantLayouts(type, defaultGeometry()),
-      visible: true
-    });
+  function saveCharacters() {
+    localStorage.setItem(CHARACTER_LAYOUT_KEY, JSON.stringify(characters.map(serializableCharacter)));
+    window.dispatchEvent(new CustomEvent('characters:change', { detail: { characters: list() } }));
   }
 
   function rawGet(id) {
     return characters.find(character => character.id === id) || null;
-  }
-
-  function activeGeometry(character, variantId = character?.variantId) {
-    if (!character) return defaultGeometry();
-    const definition = characterTypes[character.type] || characterTypes['market-worker'];
-    const fallbackId = definition.variants[0].id;
-    const id = definition.variants.some(variant => variant.id === variantId) ? variantId : fallbackId;
-    if (!character.variantLayouts) character.variantLayouts = createVariantLayouts(character.type, defaultGeometry());
-    if (!character.variantLayouts[id]) character.variantLayouts[id] = clone(defaultGeometry());
-    return character.variantLayouts[id];
   }
 
   function publicCharacter(character) {
@@ -223,6 +255,15 @@
   function characterVariant(character) {
     const definition = characterTypes[character.type] || characterTypes['market-worker'];
     return definition.variants.find(variant => variant.id === character.variantId) || definition.variants[0];
+  }
+
+  function applyGeometry(element, geometry) {
+    element.style.setProperty('--character-x', `${geometry.x}%`);
+    element.style.setProperty('--character-y', `${geometry.y}%`);
+    element.style.setProperty('--character-w', `${geometry.w}%`);
+    element.style.setProperty('--character-h', `${geometry.h}%`);
+    element.style.setProperty('--character-rotation', `${geometry.rotation || 0}deg`);
+    element.style.setProperty('--character-flip', geometry.flipX ? '-1' : '1');
   }
 
   function renderCharacters() {
@@ -258,22 +299,12 @@
           selectCharacter(rawCharacter.id);
           return;
         }
-
         event.preventDefault();
         event.stopPropagation();
         if (rawCharacter.dialogueId) window.DialogueSystem?.open?.(rawCharacter.dialogueId);
       });
       layer.appendChild(button);
     }
-  }
-
-  function applyGeometry(element, geometry) {
-    element.style.setProperty('--character-x', `${geometry.x}%`);
-    element.style.setProperty('--character-y', `${geometry.y}%`);
-    element.style.setProperty('--character-w', `${geometry.w}%`);
-    element.style.setProperty('--character-h', `${geometry.h}%`);
-    element.style.setProperty('--character-rotation', `${geometry.rotation || 0}deg`);
-    element.style.setProperty('--character-flip', geometry.flipX ? '-1' : '1');
   }
 
   function beginCharacterPointer(event, character, element) {
@@ -295,8 +326,7 @@
       startY: event.clientY,
       start: geometry,
       centerX: rect.left + rect.width * geometry.x / 100,
-      centerY: rect.top + rect.height * geometry.y / 100,
-      pointerId: event.pointerId
+      centerY: rect.top + rect.height * geometry.y / 100
     };
     element.setPointerCapture?.(event.pointerId);
     element.classList.add('is-dragging');
@@ -344,7 +374,9 @@
   function selectCharacter(id) {
     selectedCharacterId = id;
     renderCharacters();
-    window.dispatchEvent(new CustomEvent('characters:select', { detail: { id, character: publicCharacter(rawGet(id)) } }));
+    window.dispatchEvent(new CustomEvent('characters:select', {
+      detail: { id, character: publicCharacter(rawGet(id)) }
+    }));
   }
 
   function addCharacter(type = 'market-worker') {
@@ -383,8 +415,6 @@
     Object.assign(character, metadataPatch);
 
     if (variantChanged) {
-      // F2 still contains coordinates of the old frame at the exact moment the
-      // select changes. Ignore those stale values and only switch the frame.
       character.variantId = requestedVariantId;
     } else {
       const geometry = activeGeometry(character, previousVariantId);
@@ -487,7 +517,6 @@
     render: renderCharacters
   };
 
-  // Persist the migrated per-frame schema once after loading old shared-layout saves.
   saveCharacters();
   renderCharacters();
 })();
