@@ -4,6 +4,8 @@
   const DESK_LEAD_ID = 'desk-name-vladimir-zhdanov';
   const VICTIM_PERSON_ID = 'victim-unknown';
   const IDENTIFIED_TIMELINE_ID = 'victim-identified-zhdanov';
+  const FORENSIC_FACT_ID = 'victim-firearm-injuries-preliminary';
+  const FORENSIC_TIMELINE_ID = 'criminalist-preliminary-exam';
 
   function state() {
     return window.InvestigationState?.syncLegacyCase?.() || window.InvestigationState?.get?.() || null;
@@ -141,6 +143,31 @@
     return true;
   }
 
+  function registerPreliminaryForensics() {
+    if (!window.InvestigationState || hasFact(FORENSIC_FACT_ID)) return false;
+
+    window.InvestigationState.addFact({
+      id: FORENSIC_FACT_ID,
+      title: 'Огнестрельные повреждения',
+      status: 'established',
+      text: 'При первичном осмотре криминалист подтвердил огнестрельный характер повреждений у Владимира Жданова. Точное число, локализация и направление выстрелов пока не зафиксированы в доступном заключении.',
+      sourceType: 'scene-examination',
+      sourceRefs: ['S3', 'S4'],
+      sourceNote: 'Поздние источники описывают конкретные попадания, но игра намеренно не раскрывает их до отдельной фиксации/заключения.'
+    });
+
+    window.InvestigationState.addTimeline({
+      id: FORENSIC_TIMELINE_ID,
+      time: '24 августа 1994, первичный осмотр',
+      title: 'Получен предварительный вывод криминалиста',
+      status: 'established',
+      text: 'Подтверждён огнестрельный характер повреждений. Детальная схема ранений ожидает отдельной фиксации.'
+    });
+
+    window.CharacterOverlays?.setVariant?.('director-office-criminalist', 'written');
+    return true;
+  }
+
   function talkToCriminalist() {
     if (!activeCase()) return false;
 
@@ -171,10 +198,20 @@
       return true;
     }
 
+    if (registerPreliminaryForensics()) {
+      show(
+        'Новый факт',
+        'Предварительный осмотр криминалиста',
+        '«По первичному осмотру повреждения огнестрельные. Точное число попаданий, их расположение и направление сейчас не фиксируйте как окончательный вывод — сначала закончим схему и оформим заключение.»'
+      );
+      return true;
+    }
+
+    window.CharacterOverlays?.setVariant?.('director-office-criminalist', 'written');
     show(
       'Криминалист',
-      'Предварительный осмотр',
-      '«Личность зафиксировали. Повреждения огнестрельного характера, но точное число, направление и окончательные выводы я дам только после полной фиксации и заключения.»'
+      'Фиксация продолжается',
+      '«Предварительный вывод у вас есть: повреждения огнестрельные. По числу и расположению пока не спешите — это пойдёт отдельным результатом после фиксации.»'
     );
     return true;
   }
@@ -194,7 +231,7 @@
 
   document.addEventListener('click', event => {
     const hotspot = event.target.closest?.('[data-hotspot-id]');
-    if (hotspot && !game.classList.contains('is-debug')) {
+    if (hotspot && typeof debugHotspots !== 'undefined' && !debugHotspots) {
       const id = hotspot.dataset.hotspotId;
       let handled = false;
       if (id === 'director-office-desk') handled = inspectDeskIdentityLead();
